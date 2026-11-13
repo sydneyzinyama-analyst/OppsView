@@ -1,6 +1,10 @@
 # OppsView
 
-**Every email is an opportunity.** OppsView is a job application tracker for job seekers. Log each application, move it through the pipeline (Applied, Viewed, Interview, Offer, Rejected) and keep a full history of every status change.
+**Every email is an opportunity.**
+
+Job hunting means sending dozens of applications across Pnet, Indeed, LinkedIn, Workable and company portals, then losing track of which ones replied. OppsView keeps them all in one place. Log each application, move it through the pipeline (Applied, Viewed, Interview, Offer, Rejected) and see the full history of every status change.
+
+Later phases will make it smarter: a CV matcher that scores your CV against a job ad and lists the skills you're missing, automatic import of confirmation and rejection emails from Gmail, follow-up reminders when a company goes quiet, and a dashboard that shows your response rate by platform and where your applications stall.
 
 ![OppsView, Phase 1](docs/screenshot-phase1.png)
 
