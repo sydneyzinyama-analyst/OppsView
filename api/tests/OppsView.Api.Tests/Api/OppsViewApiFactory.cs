@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Time.Testing;
@@ -37,7 +38,11 @@ public sealed class OppsViewApiFactory : WebApplicationFactory<Program>
 
         builder.ConfigureServices(services =>
         {
+            // Remove the app's PostgreSQL registration. Since EF Core 9 the
+            // configuration lambda is registered separately from the options,
+            // so both have to go or Npgsql would still be configured.
             services.RemoveAll<DbContextOptions<AppDbContext>>();
+            services.RemoveAll<IDbContextOptionsConfiguration<AppDbContext>>();
             services.AddDbContext<AppDbContext>(options => options.UseSqlite(_connection));
 
             services.RemoveAll<TimeProvider>();

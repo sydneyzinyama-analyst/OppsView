@@ -1,6 +1,6 @@
 # OppsView API
 
-ASP.NET Core 8 Web API with EF Core 8 and PostgreSQL. Setup steps are in the [root README](../README.md#running-it-locally).
+ASP.NET Core 10 Web API with EF Core 10 and PostgreSQL. .NET 10 is the current long-term-support (LTS) release, supported until November 2028. Setup steps are in the [root README](../README.md#running-it-locally).
 
 ## Endpoints
 
@@ -55,7 +55,7 @@ The folders group code **by feature** (`Features/Applications`), not by technica
 - **Primary constructors.** `class ApplicationService(AppDbContext db, ...)` is C# 12 shorthand for a constructor that stores its parameters.
 - **Options pattern.** `JwtOptions` is bound from the `Jwt` configuration section and validated with data annotations at startup (`ValidateOnStart`), so a missing signing key fails immediately instead of on the first login.
 - **Configuration layering.** `appsettings.json` → `appsettings.Development.json` → user-secrets (Development only) → environment variables. Later sources win. In an environment variable, `Jwt__SigningKey` maps to `Jwt:SigningKey`.
-- **`TimeProvider`** (new in .NET 8). Code asks for the time through an injected clock, so tests can use `FakeTimeProvider`. Token issuing and token validation both use it.
+- **`TimeProvider`** (added in .NET 8). Code asks for the time through an injected clock, so tests can use `FakeTimeProvider`. Token issuing and token validation both use it.
 - **EF Core Fluent API.** Mappings live in `IEntityTypeConfiguration<T>` classes rather than attributes on entities, which keeps the domain free of persistence concerns.
 - **`[ApiController]`.** Automatically returns a 400 `ValidationProblemDetails` when a request DTO fails its `[Required]`/`[MaxLength]` checks.
 

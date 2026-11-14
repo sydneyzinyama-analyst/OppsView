@@ -12,7 +12,7 @@ This repository is a portfolio project, built in phases. Each phase adds a servi
 
 | Phase | Service | Stack | Status |
 |---|---|---|---|
-| 1 | [`api/`](api/README.md): applications, status history, accounts | ASP.NET Core 8, EF Core, PostgreSQL, JWT | ✅ done |
+| 1 | [`api/`](api/README.md): applications, status history, accounts | ASP.NET Core 10, EF Core 10, PostgreSQL, JWT | ✅ done |
 | 1 | [`web/`](web/README.md): the tracker UI | React 19, TypeScript, Vite | ✅ done |
 | 2 | [`matcher/`](matcher/README.md): CV vs job ad match score and missing skills | Python, FastAPI | planned |
 | 3 | Email import: read Pnet / Indeed / Workable confirmation and rejection emails | Gmail API (OAuth, read-only) | planned |
@@ -22,7 +22,7 @@ This repository is a portfolio project, built in phases. Each phase adds a servi
 ## Architecture (Phase 1)
 
 ```
- Browser                       ASP.NET Core 8 API                     PostgreSQL
+ Browser                       ASP.NET Core 10 API                    PostgreSQL
 ┌──────────────┐  HTTPS/JSON  ┌──────────────────────────────────┐   ┌──────────────┐
 │ React + Vite │ ───────────▶ │ Controllers (thin)               │   │ Users        │
 │  :5173       │  Bearer JWT  │   → Services (use cases, scoped  │──▶│ Applications │
@@ -45,7 +45,7 @@ Key design decisions:
 
 You need:
 
-- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
+- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) (`dotnet --list-sdks` should show a 10.0.x version)
 - [Node.js 20+](https://nodejs.org/)
 - PostgreSQL 16 or 17. Option A installs it natively (no Docker needed). Option B uses Docker.
 
