@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc.ModelBinding.Metadata;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using OppsView.Api.Data;
 using OppsView.Api.Domain;
 using OppsView.Api.Features.Applications;
@@ -68,7 +68,7 @@ builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationSc
 builder.Services.AddAuthorization();
 
 // ---- App services ------------------------------------------------------
-// TimeProvider (new in .NET 8) instead of DateTime.UtcNow, so tests can fake time.
+// TimeProvider (added in .NET 8) instead of DateTime.UtcNow, so tests can fake time.
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddHttpContextAccessor();
 // Scoped = one instance per HTTP request, the same lifetime as the DbContext they use.
@@ -104,15 +104,17 @@ builder.Services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc("v1", new OpenApiInfo { Title = "OppsView API", Version = "v1" });
     // Adds the "Authorize" button: paste a token from /auth/login.
-    var scheme = new OpenApiSecurityScheme
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Type = SecuritySchemeType.Http,
         Scheme = "bearer",
         BearerFormat = "JWT",
-        Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" },
-    };
-    options.AddSecurityDefinition("Bearer", scheme);
-    options.AddSecurityRequirement(new OpenApiSecurityRequirement { [scheme] = [] });
+        Description = "Paste the token returned by POST /auth/login.",
+    });
+    options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
+    {
+        [new OpenApiSecuritySchemeReference("Bearer", document)] = [],
+    });
 });
 
 var app = builder.Build();
