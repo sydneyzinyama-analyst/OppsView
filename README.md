@@ -2,9 +2,9 @@
 
 **Every email is an opportunity.**
 
-Job hunting means sending dozens of applications across Pnet, Indeed, LinkedIn, Workable and company portals, then losing track of which ones replied. OppsView keeps them all in one place. Log each application, move it through the pipeline (Applied, Viewed, Interview, Offer, Rejected) and see the full history of every status change.
+Job hunting means sending dozens of applications across Pnet, Indeed, LinkedIn, Workable and company portals, then losing track of which ones replied. OppsView keeps them all in one place, and fills itself in: it reads the confirmation, rejection and interview emails in your inbox, adds each application automatically and keeps its status up to date. You can still add or correct applications by hand.
 
-Later phases will make it smarter: a CV matcher that scores your CV against a job ad and lists the skills you're missing, automatic import of confirmation and rejection emails from Gmail, follow-up reminders when a company goes quiet, and a dashboard that shows your response rate by platform and where your applications stall.
+Every application moves through the pipeline (Applied, Viewed, Interview, Offer, Rejected) with a full history of every status change. Later phases add a CV matcher that scores your CV against a job ad and lists the skills you're missing, follow-up reminders when a company goes quiet, and a dashboard that shows your response rate by platform and where your applications stall.
 
 ![OppsView, Phase 1](docs/screenshot-phase1.png)
 
@@ -14,8 +14,8 @@ This repository is a portfolio project, built in phases. Each phase adds a servi
 |---|---|---|---|
 | 1 | [`api/`](api/README.md): applications, status history, accounts | ASP.NET Core 10, EF Core 10, PostgreSQL, JWT | ✅ done |
 | 1 | [`web/`](web/README.md): the tracker UI | React 19, TypeScript, Vite | ✅ done |
-| 2 | [`matcher/`](matcher/README.md): CV vs job ad match score and missing skills | Python, FastAPI | planned |
-| 3 | Email import: read Pnet / Indeed / Workable confirmation and rejection emails | Gmail API (OAuth, read-only) | planned |
+| 2 | Email import: read confirmation, rejection and interview emails from Pnet, Indeed, Workable, LinkedIn and company portals, and create or update applications automatically | Gmail API (OAuth, read-only), in the .NET API | next |
+| 3 | [`matcher/`](matcher/README.md): CV vs job ad match score and missing skills | Python, FastAPI | planned |
 | 4 | [`notifier/`](notifier/README.md): follow-up reminders after N days | Java, Spring Boot, RabbitMQ | planned |
 | 5 | [`dashboard/`](dashboard/README.md): analytics, plus CI and Azure deployment | Angular, GitHub Actions, Azure | planned |
 
@@ -134,7 +134,7 @@ Open http://localhost:5173, create an account and add your first application.
 ```
 api/         ASP.NET Core API and its tests (see api/README.md)
 web/         React app (see web/README.md)
-matcher/     Phase 2 placeholder
+matcher/     Phase 3 placeholder
 notifier/    Phase 4 placeholder
 dashboard/   Phase 5 placeholder
 docs/        screenshots and, later, the architecture diagram
