@@ -474,6 +474,49 @@ public sealed class EmailImporterTests : IDisposable
         Assert.Equal(ApplicationStatus.Applied, Applications().Single().Status);
     }
 
+    // ---- "No reply by X means unsuccessful" -------------------------------
+
+    private async Task<int> RunNoReplyCheckAsync(DateTime now)
+    {
+        await using var db = NewDb();
+        return await new NoReplyChecker(db, new FakeTimeProvider(now)).RunAsync(_userId, CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task A_confirmation_with_a_no_reply_rule_rejects_the_application_once_the_date_passes()
+    {
+        var deadline = DateOnly.FromDateTime(Now.AddDays(14));
+        await ImportAsync(Email(Received() with { NoReplyDeadline = deadline }));
+        Assert.Equal(deadline, Applications().Single().NoReplyDeadline);
+
+        Assert.Equal(0, await RunNoReplyCheckAsync(Now.AddDays(14)));
+        Assert.Equal(1, await RunNoReplyCheckAsync(Now.AddDays(15)));
+
+        var app = Applications().Single();
+        Assert.Equal(ApplicationStatus.Rejected, app.Status);
+        Assert.Equal(ApplicationSource.NoReply, app.History.Single().Source);
+        Assert.Equal(0, await RunNoReplyCheckAsync(Now.AddDays(16))); // only once
+    }
+
+    [Fact]
+    public async Task An_interview_before_the_deadline_cancels_it()
+    {
+        await ImportAsync(Email(Received() with { NoReplyDeadline = DateOnly.FromDateTime(Now.AddDays(14)) }, daysAgo: 1));
+        await ImportAsync(Email(Says(EmailKind.InterviewInvite)));
+
+        Assert.Equal(0, await RunNoReplyCheckAsync(Now.AddDays(30)));
+        Assert.Equal(ApplicationStatus.Interview, Applications().Single().Status);
+    }
+
+    [Fact]
+    public async Task A_repeat_confirmation_can_add_the_deadline_to_an_existing_application()
+    {
+        await AddManualAsync("Acme");
+        await ImportAsync(Email(Received() with { NoReplyDeadline = DateOnly.FromDateTime(Now.AddDays(10)) }));
+
+        Assert.Equal(DateOnly.FromDateTime(Now.AddDays(10)), Applications().Single().NoReplyDeadline);
+    }
+
     private sealed class StubParser : IEmailParser
     {
         public Dictionary<string, ParsedEmail> Results { get; } = [];

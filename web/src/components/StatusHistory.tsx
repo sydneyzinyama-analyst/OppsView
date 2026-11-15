@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getHistory } from '../api/applications'
 import type { Application, StatusChange } from '../api/types'
-import { formatDateTime } from '../lib/dates'
+import { formatDate, formatDateTime } from '../lib/dates'
 import { StatusBadge } from './StatusBadge'
 
 interface Props {
@@ -34,6 +34,13 @@ export function StatusHistory({ application }: Props) {
   if ('error' in loaded) return <p className="field-error">Couldn't load history: {loaded.error}</p>
 
   return (
+    <>
+    {application.noReplyDeadline && (
+      <p className="muted small deadline">
+        The employer said no reply means unsuccessful: if there's no news by{' '}
+        <strong>{formatDate(application.noReplyDeadline)}</strong>, OppsView will mark this Rejected.
+      </p>
+    )}
     <ol className="timeline" aria-label={`Status history for ${company}`}>
       <li>
         <StatusBadge status="Applied" />{' '}
@@ -48,9 +55,11 @@ export function StatusHistory({ application }: Props) {
           <span className="muted">
             from {h.fromStatus}, {formatDateTime(h.changedAt)}
             {h.source === 'Email' && ' (from email)'}
+            {h.source === 'NoReply' && ' (no reply by the deadline)'}
           </span>
         </li>
       ))}
     </ol>
+    </>
   )
 }

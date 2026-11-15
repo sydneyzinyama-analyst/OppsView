@@ -96,6 +96,8 @@ builder.Services.AddHttpClient<IGmailApi, GmailApi>();
 builder.Services.AddSingleton<OAuthStateProtector>();
 builder.Services.AddSingleton<IEmailParser, RuleBasedEmailParser>();
 builder.Services.AddScoped<EmailImporter>();
+builder.Services.AddScoped<NoReplyChecker>();
+builder.Services.AddHostedService<NoReplyCheckService>();
 builder.Services.AddScoped<GmailSyncService>();
 builder.Services.AddScoped<ReviewService>();
 

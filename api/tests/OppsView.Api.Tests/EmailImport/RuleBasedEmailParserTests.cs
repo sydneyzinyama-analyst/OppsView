@@ -273,4 +273,17 @@ public class RuleBasedEmailParserTests
     [Fact]
     public void Personal_mail_addresses_never_become_the_company() =>
         Assert.Null(_parser.Parse(Email("", "Your application for Data Analyst has been sent", "someone@gmail.com")).Company);
+
+    [Fact]
+    public void A_confirmation_carries_its_no_reply_deadline()
+    {
+        var email = new IncomingEmail("id", "careers@acme.co.za", "",
+            "Thank you for applying for the Developer role at Acme. If you do not hear from us within 2 weeks, please consider your application unsuccessful.",
+            new DateTime(2026, 11, 12, 9, 0, 0, DateTimeKind.Utc));
+
+        var parsed = _parser.Parse(email);
+
+        Assert.Equal(EmailKind.ApplicationReceived, parsed.Kind); // not a rejection: it's an "if"
+        Assert.Equal(new DateOnly(2026, 11, 26), parsed.NoReplyDeadline);
+    }
 }

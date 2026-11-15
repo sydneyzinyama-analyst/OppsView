@@ -23,6 +23,25 @@ describe('ApplicationList', () => {
     expect(screen.getByText(/No applications yet/)).toBeInTheDocument()
   })
 
+  it('shows the reply deadline and explains it in the history', async () => {
+    vi.spyOn(api, 'getHistory').mockResolvedValue([])
+    renderList({ applications: [makeApplication({ noReplyDeadline: '2026-11-26' })] })
+
+    expect(screen.getByText(/reply by/)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'History' }))
+    expect(await screen.findByText(/OppsView will mark this Rejected/)).toBeInTheDocument()
+  })
+
+  it('labels status changes made because nobody replied', async () => {
+    vi.spyOn(api, 'getHistory').mockResolvedValue([
+      { fromStatus: 'Applied', toStatus: 'Rejected', changedAt: '2026-11-27T00:00:00Z', source: 'NoReply' },
+    ])
+    renderList({ applications: [makeApplication()] })
+
+    await userEvent.click(screen.getByRole('button', { name: 'History' }))
+    expect(await screen.findByText(/no reply by the deadline/)).toBeInTheDocument()
+  })
+
   it('labels applications that came from email', () => {
     renderList({ applications: [makeApplication({ source: 'Email' })] })
     expect(screen.getByText('from email')).toBeInTheDocument()

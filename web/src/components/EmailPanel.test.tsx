@@ -34,7 +34,7 @@ describe('EmailPanel', () => {
 
   it('syncs and reports what happened', async () => {
     vi.spyOn(emailApi, 'syncEmail').mockResolvedValue({
-      created: 2, updated: 1, noChange: 0, ignored: 5, needsReview: 1, alreadyProcessed: 0, failed: 0,
+      created: 2, updated: 1, noChange: 0, ignored: 5, needsReview: 1, alreadyProcessed: 0, failed: 0, noReplyRejected: 0,
     })
     const onChanged = vi.fn()
     render(<EmailPanel status={status({ connected: true, emailAddress: 'me@gmail.com' })} onChanged={onChanged} />)

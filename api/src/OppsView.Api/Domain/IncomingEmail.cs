@@ -15,11 +15,16 @@ public sealed record IncomingEmail(
     DateTime ReceivedAt);
 
 /// <summary>What a parser understood from an email.</summary>
+/// <param name="NoReplyDeadline">
+/// "If you don't hear from us within 2 weeks, consider your application
+/// unsuccessful": the date that works out to, if the email says so.
+/// </param>
 public sealed record ParsedEmail(
     EmailKind Kind,
     JobPlatform? Platform = null,
     string? Company = null,
-    string? Role = null)
+    string? Role = null,
+    DateOnly? NoReplyDeadline = null)
 {
     public static readonly ParsedEmail Unknown = new(EmailKind.Unknown);
 }

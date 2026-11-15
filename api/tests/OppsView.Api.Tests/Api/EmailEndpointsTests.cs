@@ -357,4 +357,24 @@ public class EmailEndpointsTests(OppsViewApiFactory factory) : ApiTestBase(facto
             Factory.Google.SearchFailure = null;
         }
     }
+
+    [Fact]
+    public async Task Sync_applies_no_reply_deadlines_and_reports_them()
+    {
+        var client = await SignedInClientAsync();
+        await ConnectAsync(client);
+        var id = Guid.NewGuid().ToString("N");
+        // Received 20 days ago with a 2-week rule: already past.
+        Factory.Google.Mailbox[$"{id}-d"] = new IncomingEmail($"{id}-d", "careers@tymebank.co.za", "Application received",
+            "Thank you for applying for the Graduate Developer role at TymeBank. If you do not hear from us within 2 weeks, please consider your application unsuccessful.",
+            Factory.Time.GetUtcNow().UtcDateTime.AddDays(-20));
+
+        var summary = await (await client.PostAsync("/email/sync", null)).Content.ReadFromJsonAsync<ImportSummary>(Json);
+
+        Assert.True(summary!.NoReplyRejected >= 1);
+        var app = (await client.GetFromJsonAsync<List<ApplicationResponse>>("/applications", Json))!.Single(a => a.Company == "TymeBank");
+        Assert.Equal(ApplicationStatus.Rejected, app.Status);
+        var history = await client.GetFromJsonAsync<List<StatusChangeResponse>>($"/applications/{app.Id}/history", Json);
+        Assert.Equal(ApplicationSource.NoReply, history!.Single().Source);
+    }
 }

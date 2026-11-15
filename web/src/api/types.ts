@@ -16,8 +16,8 @@ export const PLATFORM_LABELS: Record<JobPlatform, string> = {
   Other: 'Other',
 }
 
-/** Whether something was typed in by the user or imported from an email. */
-export type ApplicationSource = 'Manual' | 'Email'
+/** Who made a change: the user, an email, or OppsView after a reply deadline passed. */
+export type ApplicationSource = 'Manual' | 'Email' | 'NoReply'
 
 export interface Application {
   id: string
@@ -30,6 +30,8 @@ export interface Application {
   jobUrl: string | null
   notes: string | null
   source: ApplicationSource
+  /** "No reply by this date means unsuccessful" (yyyy-MM-dd), from the employer's email. */
+  noReplyDeadline: string | null
   /** ISO 8601 UTC timestamps. */
   createdAt: string
   updatedAt: string
@@ -91,6 +93,8 @@ export interface ImportSummary {
   alreadyProcessed: number
   /** Emails Gmail wouldn't hand over this time; the next sync tries them again. */
   failed: number
+  /** Applications marked Rejected because the employer's reply deadline passed. */
+  noReplyRejected: number
 }
 
 /** An email OppsView wasn't sure about. */

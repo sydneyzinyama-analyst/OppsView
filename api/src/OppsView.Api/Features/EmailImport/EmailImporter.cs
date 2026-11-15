@@ -70,6 +70,10 @@ public sealed class EmailImporter(AppDbContext db, IEmailParser parser, TimeProv
             var parsed = Clean(parser.Parse(email));
             var (outcome, application, reason) = Apply(userId, email, parsed, applications, now);
 
+            // "No reply by X means unsuccessful": remember X on the application.
+            if (parsed.NoReplyDeadline is { } deadline && application is not null)
+                application.SetNoReplyDeadline(deadline);
+
             db.ImportedEmails.Add(ImportedEmail.Record(userId, email, parsed, outcome, application?.Id, reason, now));
             var stillUnclear = rechecking.Contains(email.MessageId) && outcome == ImportOutcome.NeedsReview;
             if (!stillUnclear) counts[outcome] = counts.GetValueOrDefault(outcome) + 1;

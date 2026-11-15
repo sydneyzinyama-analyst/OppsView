@@ -160,6 +160,7 @@ Restart the API. In the web app, click **Connect Gmail**, allow access, then cli
 
 - Applications created from email are tagged **from email**, and so are status changes in the history.
 - Rejections, interview invitations, offers and "viewed" notices update the matching application, or create it with that status if it wasn't in OppsView yet.
+- "If you don't hear from us within 2 weeks, consider your application unsuccessful": OppsView works out the date (days, weeks, months or working days, counted from the email), shows it under the status ("reply by 26 Nov 2026"), and if there's still no news after it, marks the application **Rejected** ("no reply by the deadline" in the history). An interview, offer or rejection before then cancels it. The check runs hourly while the API is running, and on every sync.
 - Applications whose company or job title wasn't in the email are tagged in their notes (e.g. "it came from Pnet"); when the employer later writes about the same job title, the real company name replaces it.
 - Emails OppsView can't make sense of appear under **Needs review**: add them as applications (with the details it found filled in) or ignore them.
 - **Testing-mode limit:** while the Google app is in Testing mode, Google expires the connection after 7 days, and OppsView asks you to reconnect. Removing that limit requires Google's verification, which is planned for the deployment phase.
