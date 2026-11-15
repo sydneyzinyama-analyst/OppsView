@@ -6,7 +6,7 @@ Job hunting means sending dozens of applications across Pnet, Indeed, LinkedIn, 
 
 Every application moves through the pipeline (Applied, Viewed, Interview, Offer, Rejected) with a full history of every status change. Later phases add a CV matcher that scores your CV against a job ad and lists the skills you're missing, follow-up reminders when a company goes quiet, and a dashboard that shows your response rate by platform and where your applications stall.
 
-![OppsView: email import, the review list and imported applications](docs/screenshot-phase2.png)
+![OppsView: matching a CV against a job ad](docs/screenshot-phase3.png)
 
 This repository is a portfolio project, built in phases. Each phase adds a service in a different stack.
 
@@ -15,7 +15,7 @@ This repository is a portfolio project, built in phases. Each phase adds a servi
 | 1 | [`api/`](api/README.md): applications, status history, accounts | ASP.NET Core 10, EF Core 10, PostgreSQL, JWT | ✅ done |
 | 1 | [`web/`](web/README.md): the tracker UI | React 19, TypeScript, Vite | ✅ done |
 | 2 | Email import: read confirmation, rejection and interview emails from Pnet, Indeed, Workable, LinkedIn and company portals, and create or update applications automatically | Gmail API (OAuth, read-only), in the .NET API | ✅ done |
-| 3 | [`matcher/`](matcher/README.md): CV vs job ad match score and missing skills | Python, FastAPI | planned |
+| 3 | [`matcher/`](matcher/README.md): CV vs job ad match score and missing skills | Python, FastAPI | ✅ done |
 | 4 | [`notifier/`](notifier/README.md): follow-up reminders after N days | Java, Spring Boot, RabbitMQ | planned |
 | 5 | [`dashboard/`](dashboard/README.md): analytics, plus CI and Azure deployment | Angular, GitHub Actions, Azure | planned |
 
@@ -29,10 +29,12 @@ This repository is a portfolio project, built in phases. Each phase adds a servi
 │              │ ◀─────────── │       to the signed-in user)     │   │ StatusHistory    │
 └──────────────┘              │   → Domain (entities + rules)    │   │ ImportedEmails   │
                               │   → EF Core (AppDbContext)       │   │ GmailConnections │
-                              │                                  │   └──────────────────┘
-                              │ Email import:                    │
+                              │                                  │   │ Cvs              │
+                              │ Email import:                    │   └──────────────────┘
                               │   Gmail API → parser → importer ─┼──▶ Google (read-only)
-                              │  :5226                           │
+                              │ CV matching:                     │
+                              │   MatcherClient ─────────────────┼──▶ Python matcher (FastAPI)
+                              │  :5226                           │    :8000, internal only
                               └──────────────────────────────────┘
 ```
 
@@ -44,6 +46,7 @@ Key design decisions:
 - **No secrets in the repo.** The connection string and the JWT signing key come from .NET user-secrets locally and from environment variables in CI and Azure. `.env` is git-ignored, and `.env.example` documents what goes in it.
 - **Email import acts on what it recognises.** A rule-based parser reads each job email (confirmation, viewed, interview, offer, rejection, job alert) and finds the company, role and platform, falling back to the sender's address (and, for job sites like Pnet that never name the employer, the job site's name until the employer writes). Recognised emails create or update applications through the same domain methods as the API; a status email for a job OppsView never saw creates it with that status. Only emails it can't classify, or that name neither a company nor a job title, go to **Needs review**. Plain rules rather than machine learning, so every decision can be explained and tested against real (anonymised) emails.
 - **Read-only, minimal storage.** OppsView asks Google only for `gmail.readonly`. It stores the sender, subject and the details it extracted, never email bodies. Google's refresh token is encrypted with ASP.NET Core Data Protection.
+- **The CV matcher is a separate, internal service.** It's written in Python (FastAPI) and called only by the .NET API (optionally with a shared key), never by the browser, so login checks and data access stay in one place. Matching uses a skills catalogue (`matcher/src/matcher/skills.toml`) with aliases and implied skills; required skills weigh double, and "X or Y" counts as one requirement met by either. Only the CV's text is stored, not the file.
 - **Tests exercise the real pipeline.** API integration tests boot the real app with `WebApplicationFactory`, running on in-memory SQLite (a real relational database) with a fake clock.
 
 ## Running it locally
@@ -53,6 +56,7 @@ You need:
 - [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) (`dotnet --list-sdks` should show a 10.0.x version)
 - [Node.js 20+](https://nodejs.org/)
 - PostgreSQL 16 or 17. Option A installs it natively (no Docker needed). Option B uses Docker.
+- [Python 3.12+](https://www.python.org/downloads/) for the CV matcher (`scoop install python` on Windows)
 
 The commands below are for PowerShell on Windows. They work the same in a macOS/Linux shell, except for generating the signing key (see step 3).
 
@@ -165,12 +169,41 @@ Restart the API. In the web app, click **Connect Gmail**, allow access, then cli
 - Emails OppsView can't make sense of appear under **Needs review**: add them as applications (with the details it found filled in) or ignore them.
 - **Testing-mode limit:** while the Google app is in Testing mode, Google expires the connection after 7 days, and OppsView asks you to reconnect. Removing that limit requires Google's verification, which is planned for the deployment phase.
 
+### 7. Run the CV matcher
+
+In a **third** window. See [`matcher/README.md`](matcher/README.md) for details.
+
+The first time, from `matcher/`:
+
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -e ".[dev]"
+```
+
+Every time:
+
+```powershell
+.venv\Scripts\Activate.ps1
+uvicorn matcher.api:app --reload --port 8000
+```
+
+In the web app, open **CV match**, upload your CV, paste a job ad and click **Match my CV**. To save the score on an application, pick it in the list, or click **Match CV** on its row.
+
+### Day-to-day: three windows
+
+| Window | Folder | Command |
+|---|---|---|
+| API | `api` | `dotnet run --project src/OppsView.Api` |
+| Website | `web` | `npm run dev` |
+| Matcher | `matcher` | `.venv\Scripts\Activate.ps1`, then `uvicorn matcher.api:app --reload --port 8000` |
+
 ## Repository layout
 
 ```
 api/         ASP.NET Core API and its tests (see api/README.md)
 web/         React app (see web/README.md)
-matcher/     Phase 3 placeholder
+matcher/     Python CV matcher (see matcher/README.md)
 notifier/    Phase 4 placeholder
 dashboard/   Phase 5 placeholder
 docs/        screenshots and, later, the architecture diagram
