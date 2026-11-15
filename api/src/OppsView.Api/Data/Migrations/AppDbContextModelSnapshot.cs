@@ -140,6 +140,9 @@ namespace OppsView.Api.Data.Migrations
                         .HasMaxLength(2048)
                         .HasColumnType("character varying(2048)");
 
+                    b.Property<DateOnly?>("NoReplyDeadline")
+                        .HasColumnType("date");
+
                     b.Property<string>("Notes")
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)");
@@ -171,6 +174,8 @@ namespace OppsView.Api.Data.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("NoReplyDeadline");
 
                     b.HasIndex("UserId", "AppliedOn");
 

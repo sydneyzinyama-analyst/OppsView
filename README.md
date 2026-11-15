@@ -42,7 +42,7 @@ Key design decisions:
 - **Status only moves forward.** Applied → Viewed → Interview → Offer, and an application can be Rejected from any non-final stage. Stages can be skipped. Offer and Rejected are final. Every change writes a `StatusHistory` row, which is what the Phase 5 "where do applications stall" analytics will use. The API returns `allowedNextStatuses` with each application, so the UI never duplicates the rules.
 - **Data is scoped per user.** Every query starts from "the current user's applications". Another user's application looks the same as a missing one (404), so the API never reveals which ids exist.
 - **No secrets in the repo.** The connection string and the JWT signing key come from .NET user-secrets locally and from environment variables in CI and Azure. `.env` is git-ignored, and `.env.example` documents what goes in it.
-- **Email import never guesses.** A rule-based parser reads each job email (confirmation, viewed, interview, offer, rejection, job alert) and finds the company, role and platform. The importer then creates or updates applications through the same domain methods as the API. Anything ambiguous (no company found, no matching application, two possible matches, a rejection after an offer) goes to a **Needs review** list. Plain rules rather than machine learning, so every decision can be explained and tested against real (anonymised) emails.
+- **Email import acts on what it recognises.** A rule-based parser reads each job email (confirmation, viewed, interview, offer, rejection, job alert) and finds the company, role and platform, falling back to the sender's address (and, for job sites like Pnet that never name the employer, the job site's name until the employer writes). Recognised emails create or update applications through the same domain methods as the API; a status email for a job OppsView never saw creates it with that status. Only emails it can't classify, or that name neither a company nor a job title, go to **Needs review**. Plain rules rather than machine learning, so every decision can be explained and tested against real (anonymised) emails.
 - **Read-only, minimal storage.** OppsView asks Google only for `gmail.readonly`. It stores the sender, subject and the details it extracted, never email bodies. Google's refresh token is encrypted with ASP.NET Core Data Protection.
 - **Tests exercise the real pipeline.** API integration tests boot the real app with `WebApplicationFactory`, running on in-memory SQLite (a real relational database) with a fake clock.
 
@@ -159,7 +159,10 @@ Restart the API. In the web app, click **Connect Gmail**, allow access, then cli
 **What to expect:**
 
 - Applications created from email are tagged **from email**, and so are status changes in the history.
-- Emails OppsView isn't sure about appear under **Needs review**: add them as applications (with the details it found filled in) or ignore them.
+- Rejections, interview invitations, offers and "viewed" notices update the matching application, or create it with that status if it wasn't in OppsView yet.
+- "If you don't hear from us within 2 weeks, consider your application unsuccessful": OppsView works out the date (days, weeks, months or working days, counted from the email), shows it under the status ("reply by 26 Nov 2026"), and if there's still no news after it, marks the application **Rejected** ("no reply by the deadline" in the history). An interview, offer or rejection before then cancels it. The check runs hourly while the API is running, and on every sync.
+- Applications whose company or job title wasn't in the email are tagged in their notes (e.g. "it came from Pnet"); when the employer later writes about the same job title, the real company name replaces it.
+- Emails OppsView can't make sense of appear under **Needs review**: add them as applications (with the details it found filled in) or ignore them.
 - **Testing-mode limit:** while the Google app is in Testing mode, Google expires the connection after 7 days, and OppsView asks you to reconnect. Removing that limit requires Google's verification, which is planned for the deployment phase.
 
 ## Repository layout

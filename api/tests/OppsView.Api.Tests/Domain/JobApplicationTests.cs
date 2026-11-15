@@ -173,4 +173,63 @@ public class JobApplicationTests
         Assert.Equal(ApplicationSource.Email, imported.Source);
         Assert.Equal(ApplicationSource.Email, change.Source);
     }
+
+    // ---- "No reply by X means unsuccessful" -------------------------------
+
+    [Fact]
+    public void After_the_no_reply_deadline_the_application_is_rejected_dated_the_day_after()
+    {
+        var application = NewApplication();
+        application.SetNoReplyDeadline(Today.AddDays(14));
+
+        Assert.False(application.ApplyNoReplyDeadline(Today.AddDays(14))); // on the day itself: still waiting
+        Assert.True(application.ApplyNoReplyDeadline(Today.AddDays(15)));
+
+        Assert.Equal(ApplicationStatus.Rejected, application.Status);
+        var change = Assert.Single(application.History);
+        Assert.Equal(ApplicationSource.NoReply, change.Source);
+        Assert.Equal(DateOnly.FromDateTime(change.ChangedAt), Today.AddDays(15));
+        Assert.Null(application.NoReplyDeadline);
+    }
+
+    [Theory]
+    [InlineData(ApplicationStatus.Interview)]
+    [InlineData(ApplicationStatus.Offer)]
+    [InlineData(ApplicationStatus.Rejected)]
+    public void Any_real_news_cancels_the_deadline(ApplicationStatus news)
+    {
+        var application = NewApplication();
+        application.SetNoReplyDeadline(Today.AddDays(14));
+
+        application.ChangeStatus(news, Now.AddDays(3));
+
+        Assert.Null(application.NoReplyDeadline);
+        Assert.False(application.ApplyNoReplyDeadline(Today.AddDays(30)));
+        Assert.Equal(news, application.Status);
+    }
+
+    [Fact]
+    public void Being_viewed_is_not_a_reply_so_the_deadline_stands()
+    {
+        var application = NewApplication();
+        application.SetNoReplyDeadline(Today.AddDays(14));
+        application.ChangeStatus(ApplicationStatus.Viewed, Now.AddDays(2));
+
+        Assert.True(application.ApplyNoReplyDeadline(Today.AddDays(20)));
+        Assert.Equal(ApplicationStatus.Rejected, application.Status);
+    }
+
+    [Fact]
+    public void The_latest_deadline_wins_and_closed_applications_get_none()
+    {
+        var application = NewApplication();
+        application.SetNoReplyDeadline(Today.AddDays(14));
+        application.SetNoReplyDeadline(Today.AddDays(7));
+        application.SetNoReplyDeadline(Today.AddDays(21));
+        Assert.Equal(Today.AddDays(21), application.NoReplyDeadline);
+
+        application.ChangeStatus(ApplicationStatus.Interview, Now);
+        application.SetNoReplyDeadline(Today.AddDays(30));
+        Assert.Null(application.NoReplyDeadline);
+    }
 }

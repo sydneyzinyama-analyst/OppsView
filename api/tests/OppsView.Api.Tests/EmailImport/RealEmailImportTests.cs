@@ -60,8 +60,8 @@ public sealed class RealEmailImportTests : IDisposable
             // Discovery created. FutureSoft (no job title) and Pnet (no company)
             // created with a placeholder for the missing detail. BBD (typed in
             // by hand as "BBD Software") rejected. Cartrack's rejection is for
-            // a job OppsView has never seen, so the user is asked.
-            Assert.Equal(new ImportSummary(Created: 3, Updated: 1, NoChange: 0, Ignored: 0, NeedsReview: 1, AlreadyProcessed: 0), summary);
+            // a job OppsView never saw: created, already Rejected. Nothing to review.
+            Assert.Equal(new ImportSummary(Created: 4, Updated: 1, NoChange: 0, Ignored: 0, NeedsReview: 0, AlreadyProcessed: 0), summary);
         }
 
         await using var check = NewDb();
@@ -73,8 +73,8 @@ public sealed class RealEmailImportTests : IDisposable
         Assert.Contains(apps, a => a.Company == "FutureSoft" && a.Role == EmailImporter.UnknownRole);
         Assert.Contains(apps, a => a.Company == EmailImporter.UnknownCompany && a.Role == "Junior AI & Full-Stack Developer");
 
-        var review = await check.ImportedEmails.Where(e => e.Outcome == ImportOutcome.NeedsReview)
-            .Select(e => e.MessageId).ToListAsync();
-        Assert.Equal(["cartrack-rejected.txt"], review);
+        var cartrack = apps.Single(a => a.Company == "Cartrack");
+        Assert.Equal(("IT Support Technician - Tier 1", ApplicationStatus.Rejected), (cartrack.Role, cartrack.Status));
+        Assert.False(await check.ImportedEmails.AnyAsync(e => e.Outcome == ImportOutcome.NeedsReview));
     }
 }

@@ -83,6 +83,11 @@ export function ApplicationList({ applications, onUpdate, onDelete, onChangeStat
                       disabled={busyId === a.id}
                       onChange={(s) => withBusy(a.id, () => onChangeStatus(a.id, s))}
                     />
+                    {a.noReplyDeadline && (
+                      <span className="deadline-tag" title="No reply by this date means unsuccessful (from the employer's email)">
+                        reply by {formatDate(a.noReplyDeadline)}
+                      </span>
+                    )}
                   </td>
                   <td className="row-actions">
                     <button

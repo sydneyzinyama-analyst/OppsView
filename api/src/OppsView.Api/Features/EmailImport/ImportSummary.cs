@@ -9,7 +9,9 @@ public sealed record ImportSummary(
     int NeedsReview,
     int AlreadyProcessed,
     /// <summary>Emails Gmail wouldn't hand over this time; the next sync tries them again.</summary>
-    int Failed = 0)
+    int Failed = 0,
+    /// <summary>Applications marked Rejected because the employer's reply deadline passed.</summary>
+    int NoReplyRejected = 0)
 {
     public static readonly ImportSummary Empty = new(0, 0, 0, 0, 0, 0);
 }

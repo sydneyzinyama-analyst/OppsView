@@ -27,8 +27,9 @@ public sealed class RuleBasedEmailParser : IEmailParser
 
         var (company, role) = DetailsExtractor.Extract(subject, sentences, senderName, senderAddress);
         var platform = PlatformDetector.Detect(senderAddress, text);
+        var deadline = NoReplyDeadlineFinder.Find(sentences, DateOnly.FromDateTime(email.ReceivedAt));
 
-        return new ParsedEmail(kind, platform, company, role);
+        return new ParsedEmail(kind, platform, company, role, deadline);
     }
 
     /// <summary>"Discovery Careers &lt;careers@discovery.co.za&gt;" -> ("Discovery Careers", "careers@discovery.co.za").</summary>

@@ -22,6 +22,8 @@ public class JobApplicationConfiguration : IEntityTypeConfiguration<JobApplicati
         builder.Property(a => a.Platform).HasConversion<string>().HasMaxLength(32);
         builder.Property(a => a.Status).HasConversion<string>().HasMaxLength(32);
         builder.Property(a => a.Source).HasConversion<string>().HasMaxLength(16);
+        // Found by the hourly "no reply" check, so indexed.
+        builder.HasIndex(a => a.NoReplyDeadline);
 
         builder.HasOne<User>()
             .WithMany()

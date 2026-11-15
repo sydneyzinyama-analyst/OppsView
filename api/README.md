@@ -85,6 +85,7 @@ The folders group code **by feature** (`Features/Applications`), not by technica
 | `Google:RedirectUri` | default `http://localhost:5226/email/google/callback` | Must match the Google Cloud console exactly |
 | `Google:WebAppUrl` | default `http://localhost:5173` | Where the browser goes after connecting |
 | `Google:InitialSyncDays`, `Google:MaxMessagesPerSync` | defaults 60 and 200 | |
+| `EmailImport:NoReplyCheckMinutes` | default 60 | How often the background job applies passed "no reply by X" deadlines; 0 turns it off |
 
 Data Protection keys (used to encrypt Gmail tokens) are stored in your user profile (`%LOCALAPPDATA%\ASP.NET\DataProtection-Keys` on Windows). If they are lost, stored Gmail connections can't be decrypted, and OppsView simply asks you to reconnect.
 

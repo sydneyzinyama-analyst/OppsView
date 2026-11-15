@@ -195,15 +195,17 @@ public sealed class EmailImporterTests : IDisposable
     }
 
     [Fact]
-    public async Task Two_unnamed_applications_with_the_same_title_are_not_guessed_between()
+    public async Task Two_unnamed_applications_with_the_same_title_are_not_renamed_by_guesswork()
     {
         await ImportAsync(Email(Received(company: null, role: "Developer"), daysAgo: 100));
         await ImportAsync(Email(Received(company: null, role: "Developer"), daysAgo: 1));
 
         var summary = await ImportAsync(Email(Says(EmailKind.Rejection, company: "Acme", role: "Developer")));
 
-        Assert.Equal(1, summary.NeedsReview);
-        Assert.All(Applications(), a => Assert.Equal(EmailImporter.UnknownCompany, a.Company));
+        // Can't tell which unnamed one it was, so Acme's rejection is recorded on its own.
+        Assert.Equal(1, summary.Created);
+        Assert.Equal(2, Applications().Count(a => a.Company == EmailImporter.UnknownCompany));
+        Assert.Equal(ApplicationStatus.Rejected, Applications().Single(a => a.Company == "Acme").Status);
     }
 
     [Fact]
@@ -267,38 +269,59 @@ public sealed class EmailImporterTests : IDisposable
     }
 
     [Fact]
-    public async Task A_loose_company_match_with_several_candidates_needs_review()
+    public async Task A_loose_company_match_with_several_candidates_updates_the_most_recent()
     {
-        await AddManualAsync("Discovery Health");
-        await AddManualAsync("Discovery Bank");
+        await AddManualAsync("Discovery Health", daysAgo: 20);
+        await AddManualAsync("Discovery Bank", daysAgo: 4);
 
         var summary = await ImportAsync(Email(Says(EmailKind.Rejection, company: "Discovery")));
 
-        Assert.Equal(1, summary.NeedsReview);
+        Assert.Equal(1, summary.Updated);
+        Assert.Equal(ApplicationStatus.Rejected, Applications().Single(a => a.Company == "Discovery Bank").Status);
+        Assert.Equal(ApplicationStatus.Applied, Applications().Single(a => a.Company == "Discovery Health").Status);
     }
 
     [Fact]
-    public async Task A_status_email_for_an_unknown_company_needs_review()
+    public async Task A_status_email_for_a_job_OppsView_never_saw_creates_it_with_that_status()
     {
-        var summary = await ImportAsync(Email(Says(EmailKind.Rejection, company: "Globex"), messageId: "m1"));
+        var summary = await ImportAsync(Email(Says(EmailKind.Rejection, company: "Globex", role: "Tester"), daysAgo: 1, messageId: "m1"));
 
-        Assert.Equal(1, summary.NeedsReview);
-        Assert.Contains("Globex", Imported("m1").Reason);
+        Assert.Equal(1, summary.Created);
+        var app = Applications().Single();
+        Assert.Equal(("Globex", "Tester", ApplicationStatus.Rejected, ApplicationSource.Email), (app.Company, app.Role, app.Status, app.Source));
+        Assert.Equal(DateOnly.FromDateTime(Now.AddDays(-1)), app.AppliedOn);
+        Assert.Contains("applied date is the date of that email", app.Notes);
+        Assert.Equal(app.Id, Imported("m1").ApplicationId);
     }
 
     [Fact]
-    public async Task Two_open_applications_to_the_same_company_need_review_unless_the_role_tells_them_apart()
+    public async Task A_status_email_without_a_role_creates_it_with_a_placeholder_role()
     {
-        await AddManualAsync("Acme", "Backend Developer");
-        await AddManualAsync("Acme", "Data Analyst");
+        await ImportAsync(Email(Says(EmailKind.InterviewInvite, company: "Globex")));
+        var app = Applications().Single();
+        Assert.Equal((EmailImporter.UnknownRole, ApplicationStatus.Interview), (app.Role, app.Status));
+    }
+
+    [Fact]
+    public async Task A_status_email_with_neither_company_nor_role_needs_review()
+    {
+        var summary = await ImportAsync(Email(Says(EmailKind.Rejection, company: null)));
+        Assert.Equal(1, summary.NeedsReview);
+        Assert.Empty(Applications());
+    }
+
+    [Fact]
+    public async Task With_two_applications_to_a_company_the_role_decides_and_otherwise_the_most_recent()
+    {
+        await AddManualAsync("Acme", "Backend Developer", daysAgo: 10);
+        await AddManualAsync("Acme", "Data Analyst", daysAgo: 3);
 
         var vague = await ImportAsync(Email(Says(EmailKind.InterviewInvite)));
-        var specific = await ImportAsync(Email(Says(EmailKind.InterviewInvite, role: "data analyst")));
+        var specific = await ImportAsync(Email(Says(EmailKind.Rejection, role: "backend developer")));
 
-        Assert.Equal(1, vague.NeedsReview);
-        Assert.Equal(1, specific.Updated);
+        Assert.Equal((1, 1), (vague.Updated, specific.Updated));
         Assert.Equal(ApplicationStatus.Interview, Applications().Single(a => a.Role == "Data Analyst").Status);
-        Assert.Equal(ApplicationStatus.Applied, Applications().Single(a => a.Role == "Backend Developer").Status);
+        Assert.Equal(ApplicationStatus.Rejected, Applications().Single(a => a.Role == "Backend Developer").Status);
     }
 
     [Fact]
@@ -333,15 +356,15 @@ public sealed class EmailImporterTests : IDisposable
     }
 
     [Fact]
-    public async Task A_rejection_for_an_application_with_an_offer_needs_review_and_changes_nothing()
+    public async Task A_rejection_for_an_application_with_an_offer_changes_nothing()
     {
         await AddManualAsync("Acme", status: ApplicationStatus.Offer);
 
         var summary = await ImportAsync(Email(Says(EmailKind.Rejection), messageId: "m1"));
 
-        Assert.Equal(1, summary.NeedsReview);
+        Assert.Equal(1, summary.NoChange);
         Assert.Equal(ApplicationStatus.Offer, Applications().Single().Status);
-        Assert.NotNull(Imported("m1").ApplicationId); // linked, so the review screen can show which one
+        Assert.NotNull(Imported("m1").ApplicationId);
     }
 
     // ---- Other emails and repeat syncs --------------------------------
@@ -372,20 +395,23 @@ public sealed class EmailImporterTests : IDisposable
     [Fact]
     public async Task Another_users_applications_are_never_matched()
     {
+        Guid otherAppId;
         await using (var db = NewDb())
         {
             var other = User.Create("other@example.com", Now);
             other.SetPasswordHash("hash");
             db.Users.Add(other);
-            db.Applications.Add(JobApplication.Create(other.Id, "Acme", "Developer", JobPlatform.Pnet,
-                DateOnly.FromDateTime(Now), null, null, Now));
+            var theirs = JobApplication.Create(other.Id, "Acme", "Developer", JobPlatform.Pnet,
+                DateOnly.FromDateTime(Now), null, null, Now);
+            otherAppId = theirs.Id;
+            db.Applications.Add(theirs);
             await db.SaveChangesAsync();
         }
 
         var summary = await ImportAsync(Email(Says(EmailKind.Rejection)));
 
-        Assert.Equal(1, summary.NeedsReview);
-        Assert.All(Applications(), a => Assert.Equal(ApplicationStatus.Applied, a.Status));
+        Assert.Equal(1, summary.Created); // a new application for *this* user
+        Assert.Equal(ApplicationStatus.Applied, Applications().Single(a => a.Id == otherAppId).Status);
     }
 
     [Fact]
@@ -446,6 +472,49 @@ public sealed class EmailImporterTests : IDisposable
 
         Assert.Equal(1, summary.AlreadyProcessed);
         Assert.Equal(ApplicationStatus.Applied, Applications().Single().Status);
+    }
+
+    // ---- "No reply by X means unsuccessful" -------------------------------
+
+    private async Task<int> RunNoReplyCheckAsync(DateTime now)
+    {
+        await using var db = NewDb();
+        return await new NoReplyChecker(db, new FakeTimeProvider(now)).RunAsync(_userId, CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task A_confirmation_with_a_no_reply_rule_rejects_the_application_once_the_date_passes()
+    {
+        var deadline = DateOnly.FromDateTime(Now.AddDays(14));
+        await ImportAsync(Email(Received() with { NoReplyDeadline = deadline }));
+        Assert.Equal(deadline, Applications().Single().NoReplyDeadline);
+
+        Assert.Equal(0, await RunNoReplyCheckAsync(Now.AddDays(14)));
+        Assert.Equal(1, await RunNoReplyCheckAsync(Now.AddDays(15)));
+
+        var app = Applications().Single();
+        Assert.Equal(ApplicationStatus.Rejected, app.Status);
+        Assert.Equal(ApplicationSource.NoReply, app.History.Single().Source);
+        Assert.Equal(0, await RunNoReplyCheckAsync(Now.AddDays(16))); // only once
+    }
+
+    [Fact]
+    public async Task An_interview_before_the_deadline_cancels_it()
+    {
+        await ImportAsync(Email(Received() with { NoReplyDeadline = DateOnly.FromDateTime(Now.AddDays(14)) }, daysAgo: 1));
+        await ImportAsync(Email(Says(EmailKind.InterviewInvite)));
+
+        Assert.Equal(0, await RunNoReplyCheckAsync(Now.AddDays(30)));
+        Assert.Equal(ApplicationStatus.Interview, Applications().Single().Status);
+    }
+
+    [Fact]
+    public async Task A_repeat_confirmation_can_add_the_deadline_to_an_existing_application()
+    {
+        await AddManualAsync("Acme");
+        await ImportAsync(Email(Received() with { NoReplyDeadline = DateOnly.FromDateTime(Now.AddDays(10)) }));
+
+        Assert.Equal(DateOnly.FromDateTime(Now.AddDays(10)), Applications().Single().NoReplyDeadline);
     }
 
     private sealed class StubParser : IEmailParser

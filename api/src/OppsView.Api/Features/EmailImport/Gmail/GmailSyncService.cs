@@ -13,6 +13,7 @@ public sealed class GmailSyncService(
     IGoogleOAuthClient oauth,
     IGmailApi gmail,
     EmailImporter importer,
+    NoReplyChecker noReply,
     OAuthStateProtector states,
     IDataProtectionProvider dataProtection,
     IOptions<GoogleOptions> options,
@@ -182,13 +183,21 @@ public sealed class GmailSyncService(
         }
 
         var summary = await importer.ImportAsync(userId, emails, ct, recheck);
+        // Then apply any "no reply by X" deadlines that have passed, including
+        // ones just read from these emails.
+        var noReplyRejected = await noReply.RunAsync(userId, ct);
 
         // Only move the "synced up to" point forward if every email was read,
         // otherwise the next sync's search window could skip the failed ones.
         if (failed == 0) connection.MarkSynced(now);
         await db.SaveChangesAsync(ct);
 
-        return summary with { AlreadyProcessed = summary.AlreadyProcessed + known.Count, Failed = failed };
+        return summary with
+        {
+            AlreadyProcessed = summary.AlreadyProcessed + known.Count,
+            Failed = failed,
+            NoReplyRejected = noReplyRejected,
+        };
     }
 
     public async Task DisconnectAsync(Guid userId, CancellationToken ct)

@@ -31,6 +31,13 @@ public class JobApplication
     /// <summary>Whether the user added this application or it was imported from an email.</summary>
     public ApplicationSource Source { get; private set; }
 
+    /// <summary>
+    /// "If you don't hear from us by this date, consider your application
+    /// unsuccessful." After this date, with no news, the application becomes
+    /// Rejected. Cleared as soon as there is news (interview, offer, rejection).
+    /// </summary>
+    public DateOnly? NoReplyDeadline { get; private set; }
+
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
 
@@ -97,7 +104,38 @@ public class JobApplication
         _history.Add(change);
         Status = newStatus;
         UpdatedAt = nowUtc;
+        // Real news (interview, offer, rejection) means the employer did get
+        // back to you, so a "no reply means unsuccessful" deadline is void.
+        // "Viewed" isn't a reply, so the deadline still stands.
+        if (newStatus != ApplicationStatus.Viewed) NoReplyDeadline = null;
         return change;
+    }
+
+    /// <summary>Statuses where "no reply yet" still makes sense.</summary>
+    private bool AwaitingReply => Status is ApplicationStatus.Applied or ApplicationStatus.Viewed;
+
+    /// <summary>
+    /// Records the employer's "no reply by this date means unsuccessful".
+    /// Ignored once there has been news. If several emails give a deadline,
+    /// the latest one wins (it's the most generous to the applicant).
+    /// </summary>
+    public void SetNoReplyDeadline(DateOnly deadline)
+    {
+        if (!AwaitingReply) return;
+        if (NoReplyDeadline is null || deadline > NoReplyDeadline) NoReplyDeadline = deadline;
+    }
+
+    /// <summary>
+    /// If the deadline has passed with no news, marks the application Rejected.
+    /// The rejection is dated the day after the deadline, when it took effect.
+    /// </summary>
+    /// <returns>true if the application was rejected now.</returns>
+    public bool ApplyNoReplyDeadline(DateOnly today)
+    {
+        if (NoReplyDeadline is not { } deadline || !AwaitingReply || today <= deadline) return false;
+        var effective = deadline.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        ChangeStatus(ApplicationStatus.Rejected, effective, ApplicationSource.NoReply);
+        return true;
     }
 
     private void ApplyDetails(

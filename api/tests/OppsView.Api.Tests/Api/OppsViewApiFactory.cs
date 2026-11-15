@@ -42,6 +42,8 @@ public sealed class OppsViewApiFactory : WebApplicationFactory<Program>
         builder.UseSetting("Jwt:SigningKey", "test-signing-key-that-is-at-least-32-chars");
         builder.UseSetting("Google:ClientId", "test-client-id");
         builder.UseSetting("Google:ClientSecret", "test-client-secret");
+        // Tests run the no-reply check themselves; no background timer.
+        builder.UseSetting("EmailImport:NoReplyCheckMinutes", "0");
 
         builder.ConfigureServices(services =>
         {
