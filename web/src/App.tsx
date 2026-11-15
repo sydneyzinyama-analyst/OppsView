@@ -1,7 +1,9 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { RequireAuth } from './auth/RequireAuth'
+import { AppLayout } from './components/AppLayout'
 import { ApplicationsPage } from './pages/ApplicationsPage'
 import { AuthPage } from './pages/AuthPage'
+import { MatchPage } from './pages/MatchPage'
 
 export default function App() {
   return (
@@ -12,7 +14,19 @@ export default function App() {
         path="/"
         element={
           <RequireAuth>
-            <ApplicationsPage />
+            <AppLayout>
+              <ApplicationsPage />
+            </AppLayout>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/match"
+        element={
+          <RequireAuth>
+            <AppLayout>
+              <MatchPage />
+            </AppLayout>
           </RequireAuth>
         }
       />

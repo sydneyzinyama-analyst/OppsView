@@ -1,7 +1,10 @@
 import { Fragment, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { PLATFORM_LABELS, type Application, type ApplicationStatus, type SaveApplicationRequest } from '../api/types'
 import { formatDate } from '../lib/dates'
+import { scoreClass } from '../lib/score'
 import { ApplicationForm } from './ApplicationForm'
+import { SavedMatchView } from './SavedMatchView'
 import { StatusHistory } from './StatusHistory'
 import { StatusSelect } from './StatusSelect'
 
@@ -74,7 +77,14 @@ export function ApplicationList({ applications, onUpdate, onDelete, onChangeStat
                       </span>
                     )}
                   </td>
-                  <td data-label="Role">{a.role}</td>
+                  <td data-label="Role">
+                    {a.role}
+                    {a.matchScore !== null && (
+                      <span className={`score-tag ${scoreClass(a.matchScore)}`} title="How well your CV matched this job's ad">
+                        {a.matchScore}% match
+                      </span>
+                    )}
+                  </td>
                   <td data-label="Platform">{PLATFORM_LABELS[a.platform]}</td>
                   <td data-label="Applied">{formatDate(a.appliedOn)}</td>
                   <td data-label="Status">
@@ -98,6 +108,9 @@ export function ApplicationList({ applications, onUpdate, onDelete, onChangeStat
                     >
                       History
                     </button>
+                    <Link className="link" to={`/match?applicationId=${a.id}`}>
+                      Match CV
+                    </Link>
                     <button
                       type="button"
                       className="link"
@@ -133,6 +146,7 @@ export function ApplicationList({ applications, onUpdate, onDelete, onChangeStat
                         <>
                           {a.notes && <p className="notes">{a.notes}</p>}
                           <StatusHistory application={a} />
+                          {a.matchScore !== null && <SavedMatchView applicationId={a.id} />}
                         </>
                       )}
                     </td>

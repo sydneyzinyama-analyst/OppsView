@@ -4,7 +4,7 @@ ASP.NET Core 10 Web API with EF Core 10 and PostgreSQL. .NET 10 is the current l
 
 ## Endpoints
 
-All `/applications` and `/email` endpoints (except the Google callback) need `Authorization: Bearer <token>`. In Swagger, call `/auth/login`, then click **Authorize** and paste the token.
+All `/applications`, `/email`, `/cv` and `/match` endpoints (except the Google callback) need `Authorization: Bearer <token>`. In Swagger, call `/auth/login`, then click **Authorize** and paste the token.
 
 | Method | Route | Description |
 |---|---|---|
@@ -25,6 +25,11 @@ All `/applications` and `/email` endpoints (except the Google callback) need `Au
 | GET | `/email/review` | Emails OppsView wasn't sure about. |
 | POST | `/email/review/{id}/application` | Create an application from a reviewed email (same body as `POST /applications`). A rejection email marks it Rejected. |
 | POST | `/email/review/{id}/dismiss` | Ignore a reviewed email. |
+| GET | `/cv` | Your stored CV (file name, upload time, preview), or 404. |
+| PUT | `/cv` | Upload or replace your CV (multipart `file`: PDF, .docx, .txt, max 5 MB). The matcher reads it, and only the text is kept. 400 if it can't be read. |
+| DELETE | `/cv` | Remove your CV. |
+| POST | `/match` | `{ jobAd, applicationId? }`: match your CV against the ad. With `applicationId`, the score and result are saved on that application (`matchScore`). 409 without a CV, 503 if the matcher isn't running. |
+| GET | `/applications/{id}/match` | The match saved on an application (the ad and the full result). |
 
 Errors use [RFC 7807 problem details](https://www.rfc-editor.org/rfc/rfc7807). A validation error is a 400 with camelCase field names, for example `{ "errors": { "appliedOn": ["Applied date can't be in the future."] } }`. Data annotation failures and domain rule failures produce the same shape.
 
@@ -47,6 +52,7 @@ src/OppsView.Api/
   Features/
     Applications/  Controller, service and DTOs for applications
     Auth/          Register/login, JWT issuing, options
+    Matching/      CV upload and matching: MatcherClient (HTTP to the Python matcher), service, controller
     EmailImport/   Gmail import:
       Parsing/       Rule-based email parser (text cleaning, classifier, company/role/platform)
       Gmail/         Google OAuth, Gmail API calls, sync service
@@ -85,6 +91,8 @@ The folders group code **by feature** (`Features/Applications`), not by technica
 | `Google:RedirectUri` | default `http://localhost:5226/email/google/callback` | Must match the Google Cloud console exactly |
 | `Google:WebAppUrl` | default `http://localhost:5173` | Where the browser goes after connecting |
 | `Google:InitialSyncDays`, `Google:MaxMessagesPerSync` | defaults 60 and 200 | |
+| `Matcher:BaseUrl` | default `http://localhost:8000` | Where the Python matcher runs |
+| `Matcher:ApiKey` | user-secrets / env `Matcher__ApiKey` | Optional shared key; must equal the matcher's `MATCHER_API_KEY` |
 | `EmailImport:NoReplyCheckMinutes` | default 60 | How often the background job applies passed "no reply by X" deadlines; 0 turns it off |
 
 Data Protection keys (used to encrypt Gmail tokens) are stored in your user profile (`%LOCALAPPDATA%\ASP.NET\DataProtection-Keys` on Windows). If they are lost, stored Gmail connections can't be decrypted, and OppsView simply asks you to reconnect.

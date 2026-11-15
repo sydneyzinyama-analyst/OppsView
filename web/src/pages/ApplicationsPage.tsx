@@ -3,7 +3,6 @@ import { useSearchParams } from 'react-router-dom'
 import * as api from '../api/applications'
 import { getEmailStatus, listReviewItems } from '../api/email'
 import type { Application, ApplicationStatus, EmailStatus, ReviewItem, SaveApplicationRequest } from '../api/types'
-import { useAuth } from '../auth/useAuth'
 import { ApplicationForm } from '../components/ApplicationForm'
 import { ApplicationList } from '../components/ApplicationList'
 import { EmailPanel } from '../components/EmailPanel'
@@ -16,7 +15,6 @@ import { CONNECT_RESULTS } from '../lib/email'
  * screen always shows what the server actually saved.
  */
 export function ApplicationsPage() {
-  const { session, logout } = useAuth()
   const [applications, setApplications] = useState<Application[] | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -94,20 +92,6 @@ export function ApplicationsPage() {
   }
 
   return (
-    <>
-      <header className="topbar">
-        <div>
-          <span className="brand">OppsView</span>
-          <span className="tagline">Every email is an opportunity.</span>
-        </div>
-        <div className="user">
-          <span className="muted">{session?.email}</span>
-          <button type="button" onClick={logout}>
-            Sign out
-          </button>
-        </div>
-      </header>
-
       <main className="container">
         {connectResult && (
           <p className={connectResult.ok ? 'notice' : 'alert'} role="status">
@@ -162,6 +146,5 @@ export function ApplicationsPage() {
           )}
         </section>
       </main>
-    </>
   )
 }

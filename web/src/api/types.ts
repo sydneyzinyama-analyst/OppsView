@@ -32,6 +32,8 @@ export interface Application {
   source: ApplicationSource
   /** "No reply by this date means unsuccessful" (yyyy-MM-dd), from the employer's email. */
   noReplyDeadline: string | null
+  /** 0-100 from the last CV match saved on this application, if any. */
+  matchScore: number | null
   /** ISO 8601 UTC timestamps. */
   createdAt: string
   updatedAt: string
@@ -109,4 +111,36 @@ export interface ReviewItem {
   role: string | null
   reason: string | null
   applicationId: string | null
+}
+
+// ---- CV matcher ------------------------------------------------------------
+
+export interface Cv {
+  fileName: string
+  uploadedAt: string
+  characters: number
+  /** The first few hundred characters, to confirm the right CV was read. */
+  preview: string
+}
+
+export interface SkillGroup {
+  matched: string[]
+  missing: string[]
+}
+
+export interface MatchResult {
+  /** 0-100, or null when the ad mentions no skills the matcher knows. */
+  score: number | null
+  required: SkillGroup
+  niceToHave: SkillGroup
+  /** Skills in the CV that the ad doesn't ask for. */
+  extraInCv: string[]
+  summary: string
+  applicationId: string | null
+  matchedAt: string
+}
+
+export interface SavedMatch {
+  jobAd: string
+  result: MatchResult
 }

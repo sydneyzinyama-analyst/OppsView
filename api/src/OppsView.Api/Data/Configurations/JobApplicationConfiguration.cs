@@ -16,6 +16,7 @@ public class JobApplicationConfiguration : IEntityTypeConfiguration<JobApplicati
         builder.Property(a => a.Role).HasMaxLength(JobApplication.RoleMaxLength).IsRequired();
         builder.Property(a => a.JobUrl).HasMaxLength(JobApplication.JobUrlMaxLength);
         builder.Property(a => a.Notes).HasMaxLength(JobApplication.NotesMaxLength);
+        builder.Property(a => a.JobAd).HasMaxLength(JobApplication.JobAdMaxLength);
 
         // Enums as text ("Interview", not 2): readable in SQL, and reordering
         // or inserting enum members can't silently corrupt existing rows.

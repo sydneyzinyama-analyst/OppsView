@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 import * as api from '../api/applications'
 import { makeApplication } from '../test/fixtures'
@@ -13,7 +14,11 @@ function renderList(overrides: Partial<Parameters<typeof ApplicationList>[0]> = 
     onChangeStatus: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   }
-  render(<ApplicationList {...props} />)
+  render(
+    <MemoryRouter>
+      <ApplicationList {...props} />
+    </MemoryRouter>,
+  )
   return props
 }
 
@@ -40,6 +45,13 @@ describe('ApplicationList', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'History' }))
     expect(await screen.findByText(/no reply by the deadline/)).toBeInTheDocument()
+  })
+
+  it('shows the CV match score and links to matching', () => {
+    renderList({ applications: [makeApplication({ id: 'a9', matchScore: 42 })] })
+
+    expect(screen.getByText('42% match')).toHaveClass('score-low')
+    expect(screen.getByRole('link', { name: 'Match CV' })).toHaveAttribute('href', '/match?applicationId=a9')
   })
 
   it('labels applications that came from email', () => {

@@ -10,6 +10,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<StatusChange> StatusHistory => Set<StatusChange>();
     public DbSet<ImportedEmail> ImportedEmails => Set<ImportedEmail>();
     public DbSet<GmailConnection> GmailConnections => Set<GmailConnection>();
+    public DbSet<Cv> Cvs => Set<Cv>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

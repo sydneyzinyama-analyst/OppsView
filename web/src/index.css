@@ -143,3 +143,37 @@ table.applications { width: 100%; border-collapse: collapse; }
 .small { font-size: 0.85rem; }
 .deadline-tag { display: block; margin-top: 0.2rem; font-size: 0.72rem; color: var(--muted); white-space: nowrap; }
 .deadline { margin: 0 0 0.75rem; }
+
+/* Navigation */
+.topbar-left { display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap; }
+.topbar nav { display: flex; gap: 0.25rem; }
+.topbar nav a { padding: 0.35rem 0.75rem; border-radius: 8px; color: var(--muted); text-decoration: none; font-weight: 600; }
+.topbar nav a:hover { color: var(--text); background: var(--bg); }
+.topbar nav a.active { color: var(--primary); background: var(--applied-bg); }
+
+/* CV match */
+label.button { display: inline-block; padding: 0.5rem 0.9rem; border-radius: 8px; cursor: pointer; }
+label.button.primary { background: var(--primary); color: #fff; font-weight: 600; }
+label.button.primary:hover { background: var(--primary-hover); }
+label.button.disabled { opacity: 0.6; cursor: not-allowed; }
+.cv-panel p { margin: 0 0 0.5rem; }
+.cv-preview { white-space: pre-wrap; font-size: 0.85rem; color: var(--muted); background: var(--bg); padding: 0.75rem; border-radius: 8px; }
+form[aria-label='Match a job ad'] { display: grid; gap: 1rem; }
+.match-result { display: grid; gap: 1.25rem; }
+.match-score { display: flex; align-items: center; gap: 1rem; }
+.match-score p { margin: 0; }
+.score-value { font-size: 2.5rem; font-weight: 800; line-height: 1; }
+.score-high { color: var(--offer-fg); }
+.score-mid { color: var(--interview-fg); }
+.score-low { color: var(--rejected-fg); }
+.skill-block h3 { font-size: 0.95rem; margin: 0 0 0.5rem; }
+.chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.chip { padding: 0.2rem 0.6rem; border-radius: 999px; font-size: 0.85rem; border: 1px solid var(--border); }
+.chip-have { background: var(--offer-bg); color: var(--offer-fg); border-color: transparent; }
+.chip-missing { background: var(--rejected-bg); color: var(--rejected-fg); border-color: transparent; }
+.score-tag { margin-left: 0.5rem; padding: 0.05rem 0.45rem; border-radius: 999px; font-size: 0.72rem; font-weight: 700;
+  border: 1px solid currentColor; white-space: nowrap; }
+.saved-match { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+.saved-match h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+a.link { padding: 0.2rem 0.4rem; color: var(--primary); text-decoration: none; }
+a.link:hover { text-decoration: underline; }

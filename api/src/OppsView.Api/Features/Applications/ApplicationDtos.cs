@@ -46,6 +46,7 @@ public sealed record ApplicationResponse(
     string? Notes,
     ApplicationSource Source,
     DateOnly? NoReplyDeadline,
+    int? MatchScore,
     DateTime CreatedAt,
     DateTime UpdatedAt,
     IReadOnlyList<ApplicationStatus> AllowedNextStatuses)
@@ -61,6 +62,7 @@ public sealed record ApplicationResponse(
         a.Notes,
         a.Source,
         a.NoReplyDeadline,
+        a.MatchScore,
         Utc(a.CreatedAt),
         Utc(a.UpdatedAt),
         // The server owns the transition rules; sending the allowed next
