@@ -125,7 +125,9 @@ public class EmailEndpointsTests(OppsViewApiFactory factory) : ApiTestBase(facto
         Assert.True(summary!.Created >= 1);
         Assert.True(summary.NeedsReview >= 1);
         Assert.Equal(0, second!.Created);
-        Assert.Equal(fetchedAfterFirst, Factory.Google.MessagesFetched); // nothing fetched twice
+        // Only the email still waiting for review is read again; handled ones never are.
+        Assert.Equal(fetchedAfterFirst + summary.NeedsReview, Factory.Google.MessagesFetched);
+        Assert.Equal(0, second.NeedsReview); // and it isn't reported as new
 
         var apps = await client.GetFromJsonAsync<List<ApplicationResponse>>("/applications", Json);
         var yoco = Assert.Single(apps!, a => a.Company == "Yoco");

@@ -9,6 +9,7 @@ public class CompanyNameTests
     [InlineData("Ernst & Young", "Ernst and Young")]
     [InlineData("Nestlé", "Nestle")]
     [InlineData("Standard Bank Group", "Standard Bank")]
+    [InlineData("BBD Software", "Bbdsoftware")]
     public void Treats_spelling_and_legal_suffix_variants_as_the_same(string a, string b) =>
         Assert.True(CompanyName.AreSame(a, b));
 

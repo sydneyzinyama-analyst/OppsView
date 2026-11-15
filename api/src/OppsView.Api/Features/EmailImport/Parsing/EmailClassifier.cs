@@ -6,17 +6,19 @@ namespace OppsView.Api.Features.EmailImport.Parsing;
 /// <summary>
 /// Decides what kind of email this is from the phrases in it.
 ///
-/// Two rules keep it from jumping to conclusions:
+/// Rules that keep it from jumping to conclusions:
 ///   - Sentences that describe what *might* happen ("If you do not meet the
 ///     requirements, we will let you know that your application was
 ///     unsuccessful") are skipped, because they appear in confirmation emails.
-///   - The checks run from the most specific outcome to the least: a
-///     rejection often also says "thank you for applying", so rejection is
-///     checked before confirmation.
+///   - Checks run from the most specific outcome to the least: a rejection
+///     often also says "thank you for applying", so rejection comes first.
+///   - Job sites (Pnet, Indeed, LinkedIn...) send confirmations but also a
+///     lot of marketing ("recommended for you", "apply now"). From them, only
+///     an unmistakable confirmation or status update counts.
 /// </summary>
 public static partial class EmailClassifier
 {
-    public static EmailKind Classify(string subject, IReadOnlyList<string> sentences)
+    public static EmailKind Classify(string subject, IReadOnlyList<string> sentences, bool fromJobBoard = false)
     {
         var factual = sentences.Where(s => !IsHypothetical(s)).Prepend(subject).ToList();
         bool Any(Regex pattern) => factual.Any(pattern.IsMatch);
@@ -25,8 +27,18 @@ public static partial class EmailClassifier
         if (Any(Offer())) return EmailKind.Offer;
         if (Any(Interview())) return EmailKind.InterviewInvite;
         if (Any(Viewed())) return EmailKind.ApplicationViewed;
-        if (Any(Received())) return EmailKind.ApplicationReceived;
-        if (Any(JobAlert())) return EmailKind.NotRelevant;
+
+        // "Thank you for applying" / "your application has been sent":
+        // unmistakable, even if the email also lists recommended jobs.
+        if (Any(StrongReceived())) return EmailKind.ApplicationReceived;
+
+        // Recommendations, alerts, "apply now": about jobs, not an application.
+        if (Any(Recommendation())) return EmailKind.NotRelevant;
+        if (fromJobBoard) return EmailKind.NotRelevant;
+
+        // Softer wording ("thank you for your interest"), trusted only from employers.
+        if (Any(WeakReceived())) return EmailKind.ApplicationReceived;
+
         // Nothing about an application at all: not for us.
         if (!sentences.Prepend(subject).Any(JobWords().IsMatch)) return EmailKind.NotRelevant;
         return EmailKind.Unknown;
@@ -56,17 +68,29 @@ public static partial class EmailClassifier
         RegexOptions.IgnoreCase)]
     private static partial Regex Interview();
 
-    [GeneratedRegex(@"\b(viewed|reviewed|looked at|opened) your (application|cv|profile)\b|\byour (application|cv) (was|has been) (viewed|seen|opened)\b", RegexOptions.IgnoreCase)]
+    // About the *application*. "A recruiter viewed your profile/CV" is a
+    // job-site notification about the profile, not an application update.
+    [GeneratedRegex(@"\b(viewed|reviewed|looked at|opened) your application\b|\byour application (was|has been) (viewed|seen|opened)\b", RegexOptions.IgnoreCase)]
     private static partial Regex Viewed();
 
     [GeneratedRegex(
-        @"\b(received|receipt of) your application\b|\bthank(s| you) for (applying|your application|taking the time to apply|your interest)\b" +
-        @"|\byour application (has been|was) (successfully )?(sent|submitted|received)\b|\bapplication (submitted|received)\b|\bsuccessfully applied\b",
+        @"\b(received|receipt of) your (job )?application\b|\bthank(s| you) for (applying|your application|taking the time to apply|submitting your application)\b" +
+        @"|\byour application (for .{1,100}? )?(has been|was) (successfully )?(sent|submitted|received|delivered)\b" +
+        @"|\bsuccessfully applied\b|\byou('ve| have) (successfully )?applied (for|to)\b",
         RegexOptions.IgnoreCase)]
-    private static partial Regex Received();
+    private static partial Regex StrongReceived();
 
-    [GeneratedRegex(@"\bjob alert\b|\bjobs? (matching|recommended|for you)\b|\bnew jobs?\b|\brecommended (jobs|for you)\b|\bjobs you (might|may) (like|be interested)\b", RegexOptions.IgnoreCase)]
-    private static partial Regex JobAlert();
+    [GeneratedRegex(@"\bthank(s| you) for your interest\b|\bapplication (submitted|received)\b", RegexOptions.IgnoreCase)]
+    private static partial Regex WeakReceived();
+
+    [GeneratedRegex(
+        @"\brecommend(ed|ation|ations)?\b|\bjob alerts?\b|\bjobs? (matching|for you|you (might|may)|near you|like this)\b" +
+        @"|\bsimilar (jobs|roles|positions|vacancies)\b|\bapply now\b|\bnew jobs?\b|\b(new|latest|top) (vacancies|opportunities|positions)\b" +
+        @"|\bbased on your (profile|search|cv|preferences|activity)\b|\b(you|candidates) (might|may) (also )?(like|be interested|be a (good|great) fit)\b" +
+        @"|\bare you (still )?(interested|looking|open)\b|\bdon't miss\b|\b(still|now|actively) hiring\b" +
+        @"|\b(people|others|candidates) (also )?(applied|viewed)\b|\b(daily|weekly) (jobs|digest|alert)\b|\bcomplete your profile\b|\bupdate your (cv|profile)\b",
+        RegexOptions.IgnoreCase)]
+    private static partial Regex Recommendation();
 
     [GeneratedRegex(@"\b(application|applied|apply|applying|interview|vacancy|position|role|candidate|recruit)", RegexOptions.IgnoreCase)]
     private static partial Regex JobWords();

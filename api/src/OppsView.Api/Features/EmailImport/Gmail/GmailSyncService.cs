@@ -22,6 +22,9 @@ public sealed class GmailSyncService(
     // One sync per user at a time; a double-click shouldn't import twice.
     private static readonly ConcurrentDictionary<Guid, SemaphoreSlim> SyncLocks = new();
 
+    /// <summary>How many "needs review" emails to re-read per sync.</summary>
+    private const int MaxRecheckPerSync = 50;
+
     private readonly GoogleOptions _options = options.Value;
     private readonly IDataProtector _tokens = dataProtection.CreateProtector("OppsView.Gmail.RefreshToken");
 
@@ -123,6 +126,7 @@ public sealed class GmailSyncService(
         IReadOnlyList<string> ids;
         var emails = new List<IncomingEmail>();
         var known = new HashSet<string>();
+        var recheck = new HashSet<string>();
         var failed = 0;
         try
         {
@@ -133,7 +137,19 @@ public sealed class GmailSyncService(
                     .Select(e => e.MessageId)
                     .ToListAsync(ct))
                 .ToHashSet();
-            var newIds = ids.Where(id => !known.Contains(id)).ToList();
+
+            // Emails still waiting for review get a second look each sync:
+            // OppsView doesn't keep email text, so they're fetched again.
+            recheck = (await db.ImportedEmails
+                    .Where(e => e.UserId == userId && e.Outcome == ImportOutcome.NeedsReview && e.ApplicationId == null)
+                    .OrderByDescending(e => e.ReceivedAt)
+                    .Select(e => e.MessageId)
+                    .Take(MaxRecheckPerSync)
+                    .ToListAsync(ct))
+                .ToHashSet();
+            known.ExceptWith(recheck);
+
+            var newIds = ids.Where(id => !known.Contains(id)).Union(recheck).ToList();
 
             for (var i = 0; i < newIds.Count; i++)
             {
@@ -165,7 +181,7 @@ public sealed class GmailSyncService(
             throw new GmailNotConnectedException();
         }
 
-        var summary = await importer.ImportAsync(userId, emails, ct);
+        var summary = await importer.ImportAsync(userId, emails, ct, recheck);
 
         // Only move the "synced up to" point forward if every email was read,
         // otherwise the next sync's search window could skip the failed ones.

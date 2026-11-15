@@ -51,10 +51,12 @@ public sealed class EmailImporterTests : IDisposable
     private static ParsedEmail Says(EmailKind kind, string? company = "Acme", string? role = null) =>
         new(kind, JobPlatform.Pnet, company, role);
 
-    private async Task<ImportSummary> ImportAsync(params IncomingEmail[] emails)
+    private async Task<ImportSummary> ImportAsync(params IncomingEmail[] emails) => await RecheckAsync([], emails);
+
+    private async Task<ImportSummary> RecheckAsync(HashSet<string> recheck, params IncomingEmail[] emails)
     {
         await using var db = NewDb();
-        return await new EmailImporter(db, _parser, _time).ImportAsync(_userId, emails, CancellationToken.None);
+        return await new EmailImporter(db, _parser, _time).ImportAsync(_userId, emails, CancellationToken.None, recheck);
     }
 
     private async Task<JobApplication> AddManualAsync(string company, string role = "Developer", int daysAgo = 3,
@@ -328,6 +330,49 @@ public sealed class EmailImporterTests : IDisposable
         Assert.Equal(1, again.AlreadyProcessed);
         Assert.Empty(Applications());
         Assert.Null(Imported("m1").ApplicationId);
+    }
+
+    // ---- Re-checking review items ------------------------------------------
+
+    [Fact]
+    public async Task A_review_item_that_the_parser_now_understands_is_resolved_on_recheck()
+    {
+        var email = Email(Received(company: null), messageId: "m1");
+        await ImportAsync(email);
+        Assert.Equal(ImportOutcome.NeedsReview, Imported("m1").Outcome);
+
+        // The parser improved: it now finds the company.
+        _parser.Results["m1"] = Received(company: "Entelect");
+        var summary = await RecheckAsync(["m1"], email);
+
+        Assert.Equal(1, summary.Created);
+        Assert.Equal(ImportOutcome.Created, Imported("m1").Outcome);
+        Assert.Equal("Entelect", Applications().Single().Company);
+    }
+
+    [Fact]
+    public async Task A_review_item_that_is_still_unclear_is_not_reported_again()
+    {
+        var email = Email(ParsedEmail.Unknown, messageId: "m1");
+        await ImportAsync(email);
+
+        var summary = await RecheckAsync(["m1"], email);
+
+        Assert.Equal(ImportSummary.Empty, summary);
+        Assert.Equal(ImportOutcome.NeedsReview, Imported("m1").Outcome); // still there, once
+    }
+
+    [Fact]
+    public async Task Recheck_never_touches_emails_that_were_already_handled()
+    {
+        var email = Email(Received(), messageId: "m1");
+        await ImportAsync(email);
+        _parser.Results["m1"] = Says(EmailKind.Rejection);
+
+        var summary = await RecheckAsync(["m1"], email);
+
+        Assert.Equal(1, summary.AlreadyProcessed);
+        Assert.Equal(ApplicationStatus.Applied, Applications().Single().Status);
     }
 
     private sealed class StubParser : IEmailParser

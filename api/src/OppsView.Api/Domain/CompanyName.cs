@@ -43,7 +43,11 @@ public static partial class CompanyName
     public static bool AreSame(string? a, string? b)
     {
         var x = Normalize(a);
-        return x.Length > 0 && x == Normalize(b);
+        var y = Normalize(b);
+        if (x.Length == 0) return false;
+        // Also equal without spaces: a name taken from an email address
+        // ("bbdsoftware") matches the one the user typed ("BBD Software").
+        return x == y || x.Replace(" ", "") == y.Replace(" ", "");
     }
 
     /// <summary>
