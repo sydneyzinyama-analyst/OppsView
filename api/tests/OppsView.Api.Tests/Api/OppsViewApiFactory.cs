@@ -9,6 +9,7 @@ using Microsoft.Extensions.Time.Testing;
 using Microsoft.AspNetCore.DataProtection;
 using OppsView.Api.Data;
 using OppsView.Api.Features.EmailImport.Gmail;
+using OppsView.Api.Features.Matching;
 
 namespace OppsView.Api.Tests.Api;
 
@@ -36,6 +37,9 @@ public sealed class OppsViewApiFactory : WebApplicationFactory<Program>
     /// <summary>Pretend Google (OAuth + Gmail) for the email import tests.</summary>
     public FakeGoogle Google { get; } = new();
 
+    /// <summary>Pretend Python matcher for the CV matching tests.</summary>
+    public FakeMatcher Matcher { get; } = new();
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
@@ -61,6 +65,9 @@ public sealed class OppsViewApiFactory : WebApplicationFactory<Program>
             services.RemoveAll<IGmailApi>();
             services.AddSingleton<IGoogleOAuthClient>(Google);
             services.AddSingleton<IGmailApi>(Google);
+
+            services.RemoveAll<IMatcherClient>();
+            services.AddSingleton<IMatcherClient>(Matcher);
 
             // Encryption keys in memory only, instead of the user profile.
             services.AddDataProtection().UseEphemeralDataProtectionProvider();

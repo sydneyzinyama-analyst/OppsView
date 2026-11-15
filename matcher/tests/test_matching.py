@@ -72,3 +72,12 @@ def test_an_ad_with_no_known_skills_has_no_score():
 def test_summary_explains_the_score():
     result = match("C#", "Requirements\nC#\nJava\nNice to have\nDocker")
     assert result.summary == "40% match: you have 1 of 2 required skills and 0 of 1 nice-to-have skills."
+
+
+def test_diploma_or_degree_is_satisfied_by_a_diploma():
+    result = match(
+        "Diploma in Information Technology",
+        "Minimum requirements\n- Diploma or degree in IT / Computer Science",
+    )
+    assert result.required.missing == []
+    assert result.score == 100

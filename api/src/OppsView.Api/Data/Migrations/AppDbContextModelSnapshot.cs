@@ -22,6 +22,29 @@ namespace OppsView.Api.Data.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("OppsView.Api.Domain.Cv", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(100000)
+                        .HasColumnType("character varying(100000)");
+
+                    b.Property<DateTime>("UploadedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("UserId");
+
+                    b.ToTable("Cvs", (string)null);
+                });
+
             modelBuilder.Entity("OppsView.Api.Domain.GmailConnection", b =>
                 {
                     b.Property<Guid>("UserId")
@@ -136,9 +159,22 @@ namespace OppsView.Api.Data.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("JobAd")
+                        .HasMaxLength(50000)
+                        .HasColumnType("character varying(50000)");
+
                     b.Property<string>("JobUrl")
                         .HasMaxLength(2048)
                         .HasColumnType("character varying(2048)");
+
+                    b.Property<string>("MatchResultJson")
+                        .HasColumnType("text");
+
+                    b.Property<int?>("MatchScore")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("MatchedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateOnly?>("NoReplyDeadline")
                         .HasColumnType("date");
@@ -238,6 +274,15 @@ namespace OppsView.Api.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("Users", (string)null);
+                });
+
+            modelBuilder.Entity("OppsView.Api.Domain.Cv", b =>
+                {
+                    b.HasOne("OppsView.Api.Domain.User", null)
+                        .WithOne()
+                        .HasForeignKey("OppsView.Api.Domain.Cv", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("OppsView.Api.Domain.GmailConnection", b =>

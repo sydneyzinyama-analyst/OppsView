@@ -15,6 +15,7 @@ using OppsView.Api.Features.Auth;
 using OppsView.Api.Features.EmailImport;
 using OppsView.Api.Features.EmailImport.Gmail;
 using OppsView.Api.Features.EmailImport.Parsing;
+using OppsView.Api.Features.Matching;
 using OppsView.Api.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -100,6 +101,11 @@ builder.Services.AddScoped<NoReplyChecker>();
 builder.Services.AddHostedService<NoReplyCheckService>();
 builder.Services.AddScoped<GmailSyncService>();
 builder.Services.AddScoped<ReviewService>();
+
+// ---- CV matcher (Python service) ----------------------------------------
+builder.Services.AddOptions<MatcherOptions>().BindConfiguration(MatcherOptions.SectionName);
+builder.Services.AddHttpClient<IMatcherClient, MatcherClient>(http => http.Timeout = TimeSpan.FromSeconds(30));
+builder.Services.AddScoped<MatchingService>();
 
 // ---- HTTP / JSON -------------------------------------------------------
 builder.Services

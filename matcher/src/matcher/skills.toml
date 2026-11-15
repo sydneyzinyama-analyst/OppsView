@@ -410,14 +410,15 @@ aliases = ["teamwork", "team player", "work in a team", "work well in a team"]
 [[skill]]
 name = "Degree in IT / Computer Science"
 category = "Qualifications"
-aliases = ["bsc computer science", "computer science degree", "degree in computer science", "bsc it",
+aliases = ["degree", "bsc computer science", "computer science degree", "degree in computer science", "bsc it",
+           "degree in it", "bsc", "bcom", "b.sc", "bachelor's", "bachelors",
            "bachelor's degree", "bachelors degree", "honours degree", "degree in information technology",
            "information systems degree", "bcom informatics", "bsc in computer science", "bachelor of science"]
 
 [[skill]]
 name = "Diploma in IT"
 category = "Qualifications"
-aliases = ["diploma in it", "national diploma", "diploma in information technology", "it diploma",
+aliases = ["diploma", "diploma in it", "national diploma", "diploma in information technology", "it diploma",
            "diploma in software development"]
 
 [[skill]]

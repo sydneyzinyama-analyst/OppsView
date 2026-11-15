@@ -15,6 +15,7 @@ public class JobApplication
     public const int RoleMaxLength = 200;
     public const int JobUrlMaxLength = 2048;
     public const int NotesMaxLength = 4000;
+    public const int JobAdMaxLength = 50_000;
 
     private readonly List<StatusChange> _history = [];
 
@@ -37,6 +38,17 @@ public class JobApplication
     /// Rejected. Cleared as soon as there is news (interview, offer, rejection).
     /// </summary>
     public DateOnly? NoReplyDeadline { get; private set; }
+
+    /// <summary>The job ad the CV was last matched against.</summary>
+    public string? JobAd { get; private set; }
+
+    /// <summary>0-100 from the CV matcher; null if never matched (or the ad named no known skills).</summary>
+    public int? MatchScore { get; private set; }
+
+    /// <summary>The matcher's full result (matched / missing skills) as JSON, for showing it again later.</summary>
+    public string? MatchResultJson { get; private set; }
+
+    public DateTime? MatchedAt { get; private set; }
 
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
@@ -109,6 +121,20 @@ public class JobApplication
         // "Viewed" isn't a reply, so the deadline still stands.
         if (newStatus != ApplicationStatus.Viewed) NoReplyDeadline = null;
         return change;
+    }
+
+    /// <summary>Saves the result of matching the user's CV against this job's ad.</summary>
+    public void RecordMatch(string jobAd, int? score, string resultJson, DateTime nowUtc)
+    {
+        jobAd = (jobAd ?? "").Trim();
+        if (jobAd.Length == 0) throw new DomainException(nameof(JobAd), "Paste the job ad.");
+        if (jobAd.Length > JobAdMaxLength) throw new DomainException(nameof(JobAd), "That job ad is too long.");
+        if (score is < 0 or > 100) throw new ArgumentOutOfRangeException(nameof(score));
+
+        JobAd = jobAd;
+        MatchScore = score;
+        MatchResultJson = resultJson;
+        MatchedAt = nowUtc;
     }
 
     /// <summary>Statuses where "no reply yet" still makes sense.</summary>
