@@ -1,9 +1,14 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import * as api from '../api/applications'
-import type { Application, ApplicationStatus, SaveApplicationRequest } from '../api/types'
+import { getEmailStatus, listReviewItems } from '../api/email'
+import type { Application, ApplicationStatus, EmailStatus, ReviewItem, SaveApplicationRequest } from '../api/types'
 import { useAuth } from '../auth/useAuth'
 import { ApplicationForm } from '../components/ApplicationForm'
 import { ApplicationList } from '../components/ApplicationList'
+import { EmailPanel } from '../components/EmailPanel'
+import { ReviewList } from '../components/ReviewList'
+import { CONNECT_RESULTS } from '../lib/email'
 
 /**
  * Owns the list state. Child components call back with intent ("delete this")
@@ -15,8 +20,20 @@ export function ApplicationsPage() {
   const [applications, setApplications] = useState<Application[] | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  // Bumping this re-runs the load effect (used by the Retry button).
+  const [emailStatus, setEmailStatus] = useState<EmailStatus | null>(null)
+  const [reviewItems, setReviewItems] = useState<ReviewItem[]>([])
+
+  // Google sends the browser back to /?gmail=connected (or an error code).
+  // Read it once for the banner, then tidy the URL.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [connectResult] = useState(() => CONNECT_RESULTS[searchParams.get('gmail') ?? ''] ?? null)
+  useEffect(() => {
+    if (searchParams.has('gmail')) setSearchParams({}, { replace: true })
+  }, [searchParams, setSearchParams])
+
+  // Bumping this reloads everything (Retry button, after a sync or review).
   const [reloadKey, setReloadKey] = useState(0)
+  const reload = () => setReloadKey((k) => k + 1)
 
   useEffect(() => {
     let cancelled = false
@@ -27,6 +44,15 @@ export function ApplicationsPage() {
         setError(null)
       },
       (e: Error) => !cancelled && setError(e.message),
+    )
+    // Email import is optional: if these fail, the rest of the page still works.
+    getEmailStatus().then(
+      (status) => !cancelled && setEmailStatus(status),
+      () => {},
+    )
+    listReviewItems().then(
+      (items) => !cancelled && setReviewItems(items),
+      () => {},
     )
     return () => {
       cancelled = true
@@ -83,6 +109,29 @@ export function ApplicationsPage() {
       </header>
 
       <main className="container">
+        {connectResult && (
+          <p className={connectResult.ok ? 'notice' : 'alert'} role="status">
+            {connectResult.text}
+          </p>
+        )}
+
+        {emailStatus && (
+          <section className="card">
+            <h2>Email import</h2>
+            <EmailPanel status={emailStatus} onChanged={reload} />
+          </section>
+        )}
+
+        {reviewItems.length > 0 && (
+          <section className="card">
+            <h2>
+              Needs review <span className="count">{reviewItems.length}</span>
+            </h2>
+            <p className="muted">OppsView wasn't sure about these emails. Add them as applications or ignore them.</p>
+            <ReviewList items={reviewItems} onResolved={reload} />
+          </section>
+        )}
+
         <section className="card">
           <h2>Add an application</h2>
           <ApplicationForm onSubmit={handleCreate} />
@@ -96,7 +145,7 @@ export function ApplicationsPage() {
           {error && (
             <p className="alert" role="alert">
               {error}{' '}
-              <button type="button" className="link" onClick={() => setReloadKey((k) => k + 1)}>
+              <button type="button" className="link" onClick={reload}>
                 Retry
               </button>
             </p>

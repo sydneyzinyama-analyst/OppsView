@@ -7,12 +7,17 @@ import { validateApplication, type FormState } from '../lib/validation'
 interface Props {
   /** When given, the form edits this application instead of creating one. */
   initial?: Application
+  /** Starting values for a new application (e.g. details found in an email). */
+  prefill?: Partial<SaveApplicationRequest>
+  /** Makes input ids unique when several forms are on the page. */
+  idPrefix?: string
+  submitLabel?: string
   onSubmit: (body: SaveApplicationRequest) => Promise<void>
   onCancel?: () => void
 }
 
 
-function toFormState(a?: Application): FormState {
+function toFormState(a?: Partial<SaveApplicationRequest>): FormState {
   return {
     company: a?.company ?? '',
     role: a?.role ?? '',
@@ -23,13 +28,13 @@ function toFormState(a?: Application): FormState {
   }
 }
 
-export function ApplicationForm({ initial, onSubmit, onCancel }: Props) {
+export function ApplicationForm({ initial, prefill, idPrefix: idPrefixProp, submitLabel, onSubmit, onCancel }: Props) {
   const isEdit = !!initial
-  const [form, setForm] = useState<FormState>(() => toFormState(initial))
+  const [form, setForm] = useState<FormState>(() => toFormState(initial ?? prefill))
   const [errors, setErrors] = useState<FieldErrors>({})
   const [formError, setFormError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
-  const idPrefix = isEdit ? `edit-${initial.id}` : 'new'
+  const idPrefix = idPrefixProp ?? (isEdit ? `edit-${initial.id}` : 'new')
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((f) => ({ ...f, [key]: value }))
@@ -52,7 +57,7 @@ export function ApplicationForm({ initial, onSubmit, onCancel }: Props) {
         jobUrl: form.jobUrl.trim() || null,
         notes: form.notes.trim() || null,
       })
-      if (!isEdit) setForm(toFormState())
+      if (!isEdit && !prefill) setForm(toFormState())
     } catch (err) {
       if (err instanceof ApiError && Object.keys(err.fieldErrors).length > 0) setErrors(err.fieldErrors)
       else setFormError(err instanceof Error ? err.message : 'Could not save the application.')
@@ -142,7 +147,7 @@ export function ApplicationForm({ initial, onSubmit, onCancel }: Props) {
           </button>
         )}
         <button type="submit" className="primary" disabled={submitting}>
-          {submitting ? 'Saving…' : isEdit ? 'Save changes' : 'Add application'}
+          {submitting ? 'Saving…' : (submitLabel ?? (isEdit ? 'Save changes' : 'Add application'))}
         </button>
       </div>
     </form>

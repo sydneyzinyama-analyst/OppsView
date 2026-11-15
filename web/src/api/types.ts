@@ -16,6 +16,9 @@ export const PLATFORM_LABELS: Record<JobPlatform, string> = {
   Other: 'Other',
 }
 
+/** Whether something was typed in by the user or imported from an email. */
+export type ApplicationSource = 'Manual' | 'Email'
+
 export interface Application {
   id: string
   company: string
@@ -26,6 +29,7 @@ export interface Application {
   appliedOn: string
   jobUrl: string | null
   notes: string | null
+  source: ApplicationSource
   /** ISO 8601 UTC timestamps. */
   createdAt: string
   updatedAt: string
@@ -47,10 +51,56 @@ export interface StatusChange {
   fromStatus: ApplicationStatus
   toStatus: ApplicationStatus
   changedAt: string
+  source: ApplicationSource
 }
 
 export interface AuthResponse {
   token: string
   expiresAt: string
   email: string
+}
+
+// ---- Email import (Gmail) ------------------------------------------------
+
+export type EmailKind =
+  | 'ApplicationReceived'
+  | 'ApplicationViewed'
+  | 'InterviewInvite'
+  | 'Offer'
+  | 'Rejection'
+  | 'NotRelevant'
+  | 'Unknown'
+
+export interface EmailStatus {
+  /** False when the server has no Google settings (see README). */
+  available: boolean
+  connected: boolean
+  emailAddress: string | null
+  lastSyncedAt: string | null
+  /** Google stopped accepting the connection; the user must connect again. */
+  needsReconnect: boolean
+  needsReviewCount: number
+}
+
+export interface ImportSummary {
+  created: number
+  updated: number
+  noChange: number
+  ignored: number
+  needsReview: number
+  alreadyProcessed: number
+}
+
+/** An email OppsView wasn't sure about. */
+export interface ReviewItem {
+  id: string
+  receivedAt: string
+  sender: string
+  subject: string
+  kind: EmailKind
+  platform: JobPlatform | null
+  company: string | null
+  role: string | null
+  reason: string | null
+  applicationId: string | null
 }

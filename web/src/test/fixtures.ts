@@ -10,6 +10,7 @@ export function makeApplication(overrides: Partial<Application> = {}): Applicati
     appliedOn: '2026-11-09',
     jobUrl: null,
     notes: null,
+    source: 'Manual',
     createdAt: '2026-11-09T08:00:00Z',
     updatedAt: '2026-11-09T08:00:00Z',
     allowedNextStatuses: ['Viewed', 'Interview', 'Offer', 'Rejected'],

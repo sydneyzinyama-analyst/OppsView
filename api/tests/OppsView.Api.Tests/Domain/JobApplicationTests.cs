@@ -159,4 +159,18 @@ public class JobApplicationTests
         Assert.Single(application.History);
         Assert.Equal(Now.AddDays(1), application.UpdatedAt);
     }
+
+    [Fact]
+    public void Applications_and_status_changes_record_where_they_came_from()
+    {
+        var manual = NewApplication();
+        var imported = JobApplication.Create(UserId, "Acme", "Dev", JobPlatform.Indeed, Today, null, null, Now,
+            ApplicationSource.Email);
+
+        var change = imported.ChangeStatus(ApplicationStatus.Rejected, Now.AddDays(1), ApplicationSource.Email);
+
+        Assert.Equal(ApplicationSource.Manual, manual.Source);
+        Assert.Equal(ApplicationSource.Email, imported.Source);
+        Assert.Equal(ApplicationSource.Email, change.Source);
+    }
 }

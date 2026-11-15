@@ -1,0 +1,10 @@
+From:
+Subject:
+
+Your application has been sent!
+
+Hi [NAME],
+
+Good job. Your application for Junior AI & Full-Stack Developer has been successfully sent. We’re keeping our fingers crossed that you get through to the next round.
+
+You may hear from the recruiter if your profile matches their requirements - good luck! In the meantime, you can track your application in [My Pnet](https://www.pnet.co.za/).

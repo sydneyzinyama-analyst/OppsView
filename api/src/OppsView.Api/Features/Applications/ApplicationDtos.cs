@@ -44,6 +44,7 @@ public sealed record ApplicationResponse(
     DateOnly AppliedOn,
     string? JobUrl,
     string? Notes,
+    ApplicationSource Source,
     DateTime CreatedAt,
     DateTime UpdatedAt,
     IReadOnlyList<ApplicationStatus> AllowedNextStatuses)
@@ -57,6 +58,7 @@ public sealed record ApplicationResponse(
         a.AppliedOn,
         a.JobUrl,
         a.Notes,
+        a.Source,
         Utc(a.CreatedAt),
         Utc(a.UpdatedAt),
         // The server owns the transition rules; sending the allowed next
@@ -71,8 +73,9 @@ public sealed record ApplicationResponse(
 public sealed record StatusChangeResponse(
     ApplicationStatus FromStatus,
     ApplicationStatus ToStatus,
-    DateTime ChangedAt)
+    DateTime ChangedAt,
+    ApplicationSource Source)
 {
     public static StatusChangeResponse From(StatusChange c) =>
-        new(c.FromStatus, c.ToStatus, ApplicationResponse.Utc(c.ChangedAt));
+        new(c.FromStatus, c.ToStatus, ApplicationResponse.Utc(c.ChangedAt), c.Source);
 }

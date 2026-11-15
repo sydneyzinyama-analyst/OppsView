@@ -2,11 +2,11 @@
 
 **Every email is an opportunity.**
 
-Job hunting means sending dozens of applications across Pnet, Indeed, LinkedIn, Workable and company portals, then losing track of which ones replied. OppsView keeps them all in one place. Log each application, move it through the pipeline (Applied, Viewed, Interview, Offer, Rejected) and see the full history of every status change.
+Job hunting means sending dozens of applications across Pnet, Indeed, LinkedIn, Workable and company portals, then losing track of which ones replied. OppsView keeps them all in one place, and fills itself in: it reads the confirmation, rejection and interview emails in your inbox, adds each application automatically and keeps its status up to date. You can still add or correct applications by hand.
 
-Later phases will make it smarter: a CV matcher that scores your CV against a job ad and lists the skills you're missing, automatic import of confirmation and rejection emails from Gmail, follow-up reminders when a company goes quiet, and a dashboard that shows your response rate by platform and where your applications stall.
+Every application moves through the pipeline (Applied, Viewed, Interview, Offer, Rejected) with a full history of every status change. Later phases add a CV matcher that scores your CV against a job ad and lists the skills you're missing, follow-up reminders when a company goes quiet, and a dashboard that shows your response rate by platform and where your applications stall.
 
-![OppsView, Phase 1](docs/screenshot-phase1.png)
+![OppsView: email import, the review list and imported applications](docs/screenshot-phase2.png)
 
 This repository is a portfolio project, built in phases. Each phase adds a service in a different stack.
 
@@ -14,21 +14,24 @@ This repository is a portfolio project, built in phases. Each phase adds a servi
 |---|---|---|---|
 | 1 | [`api/`](api/README.md): applications, status history, accounts | ASP.NET Core 10, EF Core 10, PostgreSQL, JWT | ✅ done |
 | 1 | [`web/`](web/README.md): the tracker UI | React 19, TypeScript, Vite | ✅ done |
-| 2 | [`matcher/`](matcher/README.md): CV vs job ad match score and missing skills | Python, FastAPI | planned |
-| 3 | Email import: read Pnet / Indeed / Workable confirmation and rejection emails | Gmail API (OAuth, read-only) | planned |
+| 2 | Email import: read confirmation, rejection and interview emails from Pnet, Indeed, Workable, LinkedIn and company portals, and create or update applications automatically | Gmail API (OAuth, read-only), in the .NET API | ✅ done |
+| 3 | [`matcher/`](matcher/README.md): CV vs job ad match score and missing skills | Python, FastAPI | planned |
 | 4 | [`notifier/`](notifier/README.md): follow-up reminders after N days | Java, Spring Boot, RabbitMQ | planned |
 | 5 | [`dashboard/`](dashboard/README.md): analytics, plus CI and Azure deployment | Angular, GitHub Actions, Azure | planned |
 
-## Architecture (Phase 1)
+## Architecture
 
 ```
  Browser                       ASP.NET Core 10 API                    PostgreSQL
-┌──────────────┐  HTTPS/JSON  ┌──────────────────────────────────┐   ┌──────────────┐
-│ React + Vite │ ───────────▶ │ Controllers (thin)               │   │ Users        │
-│  :5173       │  Bearer JWT  │   → Services (use cases, scoped  │──▶│ Applications │
-│              │ ◀─────────── │       to the signed-in user)     │   │ StatusHistory│
-└──────────────┘              │   → Domain (entities + rules)    │   └──────────────┘
-                              │   → EF Core (AppDbContext)       │
+┌──────────────┐  HTTPS/JSON  ┌──────────────────────────────────┐   ┌──────────────────┐
+│ React + Vite │ ───────────▶ │ Controllers (thin)               │   │ Users            │
+│  :5173       │  Bearer JWT  │   → Services (use cases, scoped  │──▶│ Applications     │
+│              │ ◀─────────── │       to the signed-in user)     │   │ StatusHistory    │
+└──────────────┘              │   → Domain (entities + rules)    │   │ ImportedEmails   │
+                              │   → EF Core (AppDbContext)       │   │ GmailConnections │
+                              │                                  │   └──────────────────┘
+                              │ Email import:                    │
+                              │   Gmail API → parser → importer ─┼──▶ Google (read-only)
                               │  :5226                           │
                               └──────────────────────────────────┘
 ```
@@ -39,6 +42,8 @@ Key design decisions:
 - **Status only moves forward.** Applied → Viewed → Interview → Offer, and an application can be Rejected from any non-final stage. Stages can be skipped. Offer and Rejected are final. Every change writes a `StatusHistory` row, which is what the Phase 5 "where do applications stall" analytics will use. The API returns `allowedNextStatuses` with each application, so the UI never duplicates the rules.
 - **Data is scoped per user.** Every query starts from "the current user's applications". Another user's application looks the same as a missing one (404), so the API never reveals which ids exist.
 - **No secrets in the repo.** The connection string and the JWT signing key come from .NET user-secrets locally and from environment variables in CI and Azure. `.env` is git-ignored, and `.env.example` documents what goes in it.
+- **Email import never guesses.** A rule-based parser reads each job email (confirmation, viewed, interview, offer, rejection, job alert) and finds the company, role and platform. The importer then creates or updates applications through the same domain methods as the API. Anything ambiguous (no company found, no matching application, two possible matches, a rejection after an offer) goes to a **Needs review** list. Plain rules rather than machine learning, so every decision can be explained and tested against real (anonymised) emails.
+- **Read-only, minimal storage.** OppsView asks Google only for `gmail.readonly`. It stores the sender, subject and the details it extracted, never email bodies. Google's refresh token is encrypted with ASP.NET Core Data Protection.
 - **Tests exercise the real pipeline.** API integration tests boot the real app with `WebApplicationFactory`, running on in-memory SQLite (a real relational database) with a fake clock.
 
 ## Running it locally
@@ -129,12 +134,40 @@ npm run dev
 
 Open http://localhost:5173, create an account and add your first application.
 
+### 6. Connect Gmail (optional, about 15 minutes)
+
+Without this step everything works, and you add applications by hand. With it, OppsView reads your job emails and fills itself in.
+
+**In the Google Cloud console** (https://console.cloud.google.com), signed in with the Gmail account you job-hunt with:
+
+1. **Create a project.** Use the project picker at the top, choose **New project**, name it `OppsView` and click **Create**. Make sure it's selected.
+2. **Enable the Gmail API.** Search for **Gmail API** and click **Enable**.
+3. **Set up the consent screen.** Open **Google Auth Platform** (also called "OAuth consent screen") and click **Get started**. Enter app name `OppsView` and your email, choose audience **External**, and click **Create**.
+4. **Add yourself as a test user.** Under **Audience → Test users**, add your Gmail address. Leave the publishing status on **Testing**.
+5. **Allow read-only Gmail access.** Under **Data Access → Add or remove scopes**, tick `.../auth/gmail.readonly`, then click **Update** and **Save**.
+6. **Create the credentials.** Under **Clients → Create client**, choose **Web application**, and add the authorized redirect URI `http://localhost:5226/email/google/callback` (exactly). Click **Create** and copy the **Client ID** and **Client secret**.
+
+**Store them as user-secrets** (from `api/`, with single quotes):
+
+```powershell
+dotnet user-secrets set "Google:ClientId" 'YOUR_CLIENT_ID' --project src/OppsView.Api
+dotnet user-secrets set "Google:ClientSecret" 'YOUR_CLIENT_SECRET' --project src/OppsView.Api
+```
+
+Restart the API. In the web app, click **Connect Gmail**, allow access, then click **Sync now**. The first sync looks back 60 days.
+
+**What to expect:**
+
+- Applications created from email are tagged **from email**, and so are status changes in the history.
+- Emails OppsView isn't sure about appear under **Needs review**: add them as applications (with the details it found filled in) or ignore them.
+- **Testing-mode limit:** while the Google app is in Testing mode, Google expires the connection after 7 days, and OppsView asks you to reconnect. Removing that limit requires Google's verification, which is planned for the deployment phase.
+
 ## Repository layout
 
 ```
 api/         ASP.NET Core API and its tests (see api/README.md)
 web/         React app (see web/README.md)
-matcher/     Phase 2 placeholder
+matcher/     Phase 3 placeholder
 notifier/    Phase 4 placeholder
 dashboard/   Phase 5 placeholder
 docs/        screenshots and, later, the architecture diagram

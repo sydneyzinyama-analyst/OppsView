@@ -17,6 +17,7 @@ public class StatusChangeConfiguration : IEntityTypeConfiguration<StatusChange>
         builder.Property(h => h.Id).ValueGeneratedNever();
         builder.Property(h => h.FromStatus).HasConversion<string>().HasMaxLength(32);
         builder.Property(h => h.ToStatus).HasConversion<string>().HasMaxLength(32);
+        builder.Property(h => h.Source).HasConversion<string>().HasMaxLength(16);
         builder.HasIndex(h => new { h.ApplicationId, h.ChangedAt });
     }
 }

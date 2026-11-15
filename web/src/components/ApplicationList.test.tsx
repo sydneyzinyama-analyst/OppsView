@@ -23,6 +23,11 @@ describe('ApplicationList', () => {
     expect(screen.getByText(/No applications yet/)).toBeInTheDocument()
   })
 
+  it('labels applications that came from email', () => {
+    renderList({ applications: [makeApplication({ source: 'Email' })] })
+    expect(screen.getByText('from email')).toBeInTheDocument()
+  })
+
   it('renders a row per application and links to the job ad', () => {
     renderList()
     expect(screen.getByText('Acme')).toBeInTheDocument()
@@ -62,7 +67,7 @@ describe('ApplicationList', () => {
 
   it('loads and shows the status history', async () => {
     vi.spyOn(api, 'getHistory').mockResolvedValue([
-      { fromStatus: 'Applied', toStatus: 'Interview', changedAt: '2026-11-10T09:00:00Z' },
+      { fromStatus: 'Applied', toStatus: 'Interview', changedAt: '2026-11-10T09:00:00Z', source: 'Manual' },
     ])
     renderList()
 
