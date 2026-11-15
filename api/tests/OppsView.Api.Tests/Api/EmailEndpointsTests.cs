@@ -184,32 +184,37 @@ public class EmailEndpointsTests(OppsViewApiFactory factory) : ApiTestBase(facto
         var client = await SignedInClientAsync();
         await ConnectAsync(client);
         var id = Guid.NewGuid().ToString("N");
-        // A rejection from a company with no application yet, and an unclear email.
+        // A rejection for a job OppsView never saw: created automatically.
         AddToMailbox($"{id}-r", "Your application",
             "Thank you for your interest in working for Cartrack by applying to the Support Technician position. Your application has been unsuccessful.");
-        AddToMailbox($"{id}-u", "Profile", "Please log in to see the next steps for your application.");
+        // Two emails about an application that OppsView can't read: for review.
+        AddToMailbox($"{id}-u1", "Next steps", "Please log in to see the next steps for your application.", from: "careers@globex.co.za");
+        AddToMailbox($"{id}-u2", "Profile", "Please log in to see the next steps for your application.");
         await client.PostAsync("/email/sync", null);
 
-        var items = await client.GetFromJsonAsync<List<ReviewItemResponse>>("/email/review", Json);
-        var rejection = Assert.Single(items!, i => i.Company == "Cartrack");
-        var unclear = Assert.Single(items!, i => i.Subject == "Profile");
+        var apps = (await client.GetFromJsonAsync<List<ApplicationResponse>>("/applications", Json))!;
+        Assert.Equal(ApplicationStatus.Rejected, apps.Single(a => a.Company == "Cartrack").Status);
 
-        var created = await client.PostAsJsonAsync($"/email/review/{rejection.Id}/application", new
+        var items = await client.GetFromJsonAsync<List<ReviewItemResponse>>("/email/review", Json);
+        var toAdd = Assert.Single(items!, i => i.Subject == "Next steps");
+        var toIgnore = Assert.Single(items!, i => i.Subject == "Profile");
+        Assert.Equal("Globex", toAdd.Company); // found from the address, for the pre-filled form
+
+        var created = await client.PostAsJsonAsync($"/email/review/{toAdd.Id}/application", new
         {
-            company = "Cartrack", role = "Support Technician", platform = "CompanyPortal",
+            company = "Globex", role = "Analyst", platform = "CompanyPortal",
             appliedOn = Today.AddDays(-10).ToString("yyyy-MM-dd"),
         });
-        var dismissed = await client.PostAsync($"/email/review/{unclear.Id}/dismiss", null);
+        var dismissed = await client.PostAsync($"/email/review/{toIgnore.Id}/dismiss", null);
 
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
-        var app = await created.Content.ReadFromJsonAsync<ApplicationResponse>(Json);
-        Assert.Equal(ApplicationStatus.Rejected, app!.Status); // the email was a rejection
+        Assert.Equal(ApplicationStatus.Applied, (await created.Content.ReadFromJsonAsync<ApplicationResponse>(Json))!.Status);
         Assert.Equal(HttpStatusCode.NoContent, dismissed.StatusCode);
         Assert.DoesNotContain((await client.GetFromJsonAsync<List<ReviewItemResponse>>("/email/review", Json))!,
-            i => i.Id == rejection.Id || i.Id == unclear.Id);
+            i => i.Id == toAdd.Id || i.Id == toIgnore.Id);
 
         // Dealt with already: a second decision is refused.
-        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsync($"/email/review/{unclear.Id}/dismiss", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsync($"/email/review/{toIgnore.Id}/dismiss", null)).StatusCode);
     }
 
     [Fact]
