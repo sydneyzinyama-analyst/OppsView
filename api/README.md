@@ -4,7 +4,7 @@ ASP.NET Core 10 Web API with EF Core 10 and PostgreSQL. .NET 10 is the current l
 
 ## Endpoints
 
-All `/applications` endpoints need `Authorization: Bearer <token>`. In Swagger, call `/auth/login`, then click **Authorize** and paste the token.
+All `/applications` and `/email` endpoints (except the Google callback) need `Authorization: Bearer <token>`. In Swagger, call `/auth/login`, then click **Authorize** and paste the token.
 
 | Method | Route | Description |
 |---|---|---|
@@ -17,6 +17,14 @@ All `/applications` endpoints need `Authorization: Bearer <token>`. In Swagger, 
 | DELETE | `/applications/{id}` | Delete it and its history. Returns 204. |
 | PATCH | `/applications/{id}/status` | `{ "status": "Interview" }`. Validated against the transition rules. |
 | GET | `/applications/{id}/history` | Status changes, oldest first. |
+| GET | `/email/status` | Whether Gmail import is available and connected, the last sync time and the number of emails needing review. |
+| POST | `/email/google/connect` | Returns Google's consent URL (read-only Gmail, PKCE). Returns 503 if the server has no Google settings. |
+| GET | `/email/google/callback` | Google's redirect back after consent (anonymous; the encrypted `state` identifies the user). Redirects to the web app with `?gmail=connected`, `denied`, `scope`, `expired` or `error`. |
+| DELETE | `/email/google` | Disconnect: revokes the token at Google and deletes it. |
+| POST | `/email/sync` | Import new job emails. Returns counts (`created`, `updated`, `needsReview`...). Returns 409 if Gmail needs reconnecting or a sync is already running. |
+| GET | `/email/review` | Emails OppsView wasn't sure about. |
+| POST | `/email/review/{id}/application` | Create an application from a reviewed email (same body as `POST /applications`). A rejection email marks it Rejected. |
+| POST | `/email/review/{id}/dismiss` | Ignore a reviewed email. |
 
 Errors use [RFC 7807 problem details](https://www.rfc-editor.org/rfc/rfc7807). A validation error is a 400 with camelCase field names, for example `{ "errors": { "appliedOn": ["Applied date can't be in the future."] } }`. Data annotation failures and domain rule failures produce the same shape.
 
@@ -39,11 +47,16 @@ src/OppsView.Api/
   Features/
     Applications/  Controller, service and DTOs for applications
     Auth/          Register/login, JWT issuing, options
+    EmailImport/   Gmail import:
+      Parsing/       Rule-based email parser (text cleaning, classifier, company/role/platform)
+      Gmail/         Google OAuth, Gmail API calls, sync service
+      EmailImporter  Turns parsed emails into application changes (or "needs review")
   Infrastructure/  Cross-cutting pieces: current user, DomainException → 400 filter
   Program.cs       Composition root: DI, auth, JSON, CORS, Swagger
 tests/OppsView.Api.Tests/
   Domain/          Unit tests for entities and transition rules
   Auth/            Token lifetime rules
+  EmailImport/     Parser, importer and Gmail message tests; Samples/ holds real anonymised emails
   Api/             Integration tests over HTTP (WebApplicationFactory + SQLite)
 ```
 
@@ -68,6 +81,12 @@ The folders group code **by feature** (`Features/Applications`), not by technica
 | `Jwt:Issuer`, `Jwt:Audience` | appsettings.json | |
 | `Jwt:ExpiryMinutes` | appsettings.json | Default 480 (8 hours) |
 | `Cors:AllowedOrigins` | appsettings.Development.json | `http://localhost:5173` locally |
+| `Google:ClientId`, `Google:ClientSecret` | user-secrets / env `Google__ClientId`, `Google__ClientSecret` | **Secret.** Optional: without them, email import reports it isn't set up |
+| `Google:RedirectUri` | default `http://localhost:5226/email/google/callback` | Must match the Google Cloud console exactly |
+| `Google:WebAppUrl` | default `http://localhost:5173` | Where the browser goes after connecting |
+| `Google:InitialSyncDays`, `Google:MaxMessagesPerSync` | defaults 60 and 200 | |
+
+Data Protection keys (used to encrypt Gmail tokens) are stored in your user profile (`%LOCALAPPDATA%\ASP.NET\DataProtection-Keys` on Windows). If they are lost, stored Gmail connections can't be decrypted, and OppsView simply asks you to reconnect.
 
 ## Common commands
 
