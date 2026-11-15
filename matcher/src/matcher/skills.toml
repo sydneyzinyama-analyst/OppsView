@@ -1,0 +1,432 @@
+# The skills OppsView recognises, and the different ways people write them.
+#
+# Each [[skill]] has:
+#   name           how it's shown ("C#")
+#   category       for grouping in the UI
+#   aliases        other spellings, matched as whole words, ignoring case
+#   case_sensitive aliases that only count in this exact case (for short,
+#                  ambiguous ones like "Go", which is also an English word)
+#   implies        skills you clearly have if you have this one
+#                  (PostgreSQL implies SQL; ASP.NET Core implies C# and .NET)
+#
+# To add a skill, copy a block and edit it. No code changes needed.
+
+# ---- Languages --------------------------------------------------------------
+[[skill]]
+name = "C#"
+category = "Languages"
+aliases = ["c#", "csharp", "c sharp", "c-sharp"]
+
+[[skill]]
+name = "Java"
+category = "Languages"
+aliases = ["java", "java 8", "java 11", "java 17", "java 21", "j2ee", "java ee", "jakarta ee"]
+
+[[skill]]
+name = "Python"
+category = "Languages"
+aliases = ["python", "python3", "python 3"]
+
+[[skill]]
+name = "JavaScript"
+category = "Languages"
+aliases = ["javascript", "js", "ecmascript", "es6", "vanilla js"]
+
+[[skill]]
+name = "TypeScript"
+category = "Languages"
+aliases = ["typescript"]
+implies = ["JavaScript"]
+
+[[skill]]
+name = "C++"
+category = "Languages"
+aliases = ["c++", "cpp"]
+
+[[skill]]
+name = "Go"
+category = "Languages"
+aliases = ["golang"]
+case_sensitive = ["Go"]
+
+[[skill]]
+name = "PHP"
+category = "Languages"
+aliases = ["php"]
+
+[[skill]]
+name = "Kotlin"
+category = "Languages"
+aliases = ["kotlin"]
+
+[[skill]]
+name = "Swift"
+category = "Languages"
+aliases = ["swiftui"]
+case_sensitive = ["Swift"]
+
+[[skill]]
+name = "Dart"
+category = "Languages"
+aliases = ["dart"]
+
+[[skill]]
+name = "Ruby"
+category = "Languages"
+aliases = ["ruby"]
+
+[[skill]]
+name = "VB.NET"
+category = "Languages"
+aliases = ["vb.net", "visual basic"]
+
+[[skill]]
+name = "HTML"
+category = "Languages"
+aliases = ["html", "html5"]
+
+[[skill]]
+name = "CSS"
+category = "Languages"
+aliases = ["css", "css3", "scss", "sass"]
+
+[[skill]]
+name = "SQL"
+category = "Data"
+aliases = ["sql", "t-sql", "tsql", "pl/sql", "plsql", "sql queries"]
+
+# ---- Backend frameworks -----------------------------------------------------
+[[skill]]
+name = ".NET"
+category = "Backend"
+aliases = [".net", "dotnet", ".net core", ".net framework", ".net 6", ".net 7", ".net 8", ".net 9", ".net 10"]
+implies = ["C#"]
+
+[[skill]]
+name = "ASP.NET Core"
+category = "Backend"
+aliases = ["asp.net core", "asp.net", "asp.net mvc", "aspnet", "web api", "asp.net web api"]
+implies = [".NET", "C#"]
+
+[[skill]]
+name = "Entity Framework"
+category = "Backend"
+aliases = ["entity framework", "ef core", "entity framework core"]
+implies = [".NET"]
+
+[[skill]]
+name = "Spring Boot"
+category = "Backend"
+aliases = ["spring boot", "springboot", "spring framework", "spring mvc"]
+case_sensitive = ["Spring"]
+implies = ["Java"]
+
+[[skill]]
+name = "Node.js"
+category = "Backend"
+aliases = ["node.js", "nodejs", "node js"]
+implies = ["JavaScript"]
+
+[[skill]]
+name = "Express"
+category = "Backend"
+aliases = ["express.js", "expressjs"]
+case_sensitive = ["Express"]
+implies = ["Node.js"]
+
+[[skill]]
+name = "Django"
+category = "Backend"
+aliases = ["django"]
+implies = ["Python"]
+
+[[skill]]
+name = "FastAPI"
+category = "Backend"
+aliases = ["fastapi"]
+implies = ["Python", "REST APIs"]
+
+[[skill]]
+name = "Flask"
+category = "Backend"
+aliases = ["flask"]
+implies = ["Python"]
+
+[[skill]]
+name = "Laravel"
+category = "Backend"
+aliases = ["laravel"]
+implies = ["PHP"]
+
+[[skill]]
+name = "REST APIs"
+category = "Backend"
+aliases = ["restful", "rest api", "rest apis", "restful api", "restful apis", "restful services", "rest services",
+           "web api", "web apis"]
+case_sensitive = ["REST"]
+
+[[skill]]
+name = "GraphQL"
+category = "Backend"
+aliases = ["graphql"]
+
+[[skill]]
+name = "Microservices"
+category = "Backend"
+aliases = ["microservices", "micro-services", "microservice architecture"]
+
+# ---- Frontend ---------------------------------------------------------------
+[[skill]]
+name = "React"
+category = "Frontend"
+aliases = ["react.js", "reactjs", "react js"]
+case_sensitive = ["React"]
+implies = ["JavaScript"]
+
+[[skill]]
+name = "Next.js"
+category = "Frontend"
+aliases = ["next.js", "nextjs"]
+implies = ["React"]
+
+[[skill]]
+name = "Angular"
+category = "Frontend"
+aliases = ["angular", "angularjs", "angular.js"]
+implies = ["TypeScript"]
+
+[[skill]]
+name = "Vue"
+category = "Frontend"
+aliases = ["vue", "vue.js", "vuejs", "nuxt"]
+implies = ["JavaScript"]
+
+[[skill]]
+name = "Flutter"
+category = "Frontend"
+aliases = ["flutter"]
+implies = ["Dart"]
+
+[[skill]]
+name = "React Native"
+category = "Frontend"
+aliases = ["react native"]
+implies = ["React"]
+
+[[skill]]
+name = "Tailwind CSS"
+category = "Frontend"
+aliases = ["tailwind", "tailwindcss", "tailwind css"]
+implies = ["CSS"]
+
+[[skill]]
+name = "Bootstrap"
+category = "Frontend"
+aliases = ["bootstrap"]
+
+# ---- Data -------------------------------------------------------------------
+[[skill]]
+name = "PostgreSQL"
+category = "Data"
+aliases = ["postgresql", "postgres", "psql"]
+implies = ["SQL"]
+
+[[skill]]
+name = "SQL Server"
+category = "Data"
+aliases = ["sql server", "mssql", "ms sql", "microsoft sql server"]
+implies = ["SQL"]
+
+[[skill]]
+name = "MySQL"
+category = "Data"
+aliases = ["mysql", "mariadb"]
+implies = ["SQL"]
+
+[[skill]]
+name = "Oracle Database"
+category = "Data"
+aliases = ["oracle database", "oracle db", "oracle sql"]
+implies = ["SQL"]
+
+[[skill]]
+name = "MongoDB"
+category = "Data"
+aliases = ["mongodb", "mongo"]
+
+[[skill]]
+name = "Redis"
+category = "Data"
+aliases = ["redis"]
+
+[[skill]]
+name = "Power BI"
+category = "Data"
+aliases = ["power bi", "powerbi"]
+
+[[skill]]
+name = "Excel"
+category = "Data"
+aliases = ["ms excel", "microsoft excel", "excel spreadsheets"]
+case_sensitive = ["Excel"]
+
+[[skill]]
+name = "Pandas"
+category = "Data"
+aliases = ["pandas"]
+implies = ["Python"]
+
+[[skill]]
+name = "Machine Learning"
+category = "Data"
+aliases = ["machine learning", "ml", "scikit-learn", "sklearn"]
+
+[[skill]]
+name = "AI / LLMs"
+category = "Data"
+aliases = ["llm", "llms", "large language models", "generative ai", "genai", "openai", "langchain", "prompt engineering", "rag"]
+case_sensitive = ["AI"]
+
+# ---- Cloud & DevOps ---------------------------------------------------------
+[[skill]]
+name = "Azure"
+category = "Cloud & DevOps"
+aliases = ["azure", "microsoft azure", "azure devops", "azure functions", "app service"]
+
+[[skill]]
+name = "AWS"
+category = "Cloud & DevOps"
+aliases = ["aws", "amazon web services", "ec2", "s3", "lambda"]
+
+[[skill]]
+name = "Google Cloud"
+category = "Cloud & DevOps"
+aliases = ["gcp", "google cloud", "google cloud platform"]
+
+[[skill]]
+name = "Docker"
+category = "Cloud & DevOps"
+aliases = ["docker", "containers", "containerisation", "containerization", "docker compose"]
+
+[[skill]]
+name = "Kubernetes"
+category = "Cloud & DevOps"
+aliases = ["kubernetes", "k8s", "aks", "eks"]
+
+[[skill]]
+name = "CI/CD"
+category = "Cloud & DevOps"
+aliases = ["ci/cd", "ci cd", "cicd", "continuous integration", "continuous delivery", "continuous deployment",
+           "github actions", "jenkins", "gitlab ci", "azure pipelines"]
+
+[[skill]]
+name = "Git"
+category = "Cloud & DevOps"
+aliases = ["git", "github", "gitlab", "bitbucket", "version control"]
+
+[[skill]]
+name = "Linux"
+category = "Cloud & DevOps"
+aliases = ["linux", "ubuntu", "unix", "bash"]
+
+[[skill]]
+name = "Terraform"
+category = "Cloud & DevOps"
+aliases = ["terraform", "infrastructure as code", "iac"]
+
+[[skill]]
+name = "RabbitMQ"
+category = "Cloud & DevOps"
+aliases = ["rabbitmq", "message queue", "message queues", "message broker"]
+
+[[skill]]
+name = "Kafka"
+category = "Cloud & DevOps"
+aliases = ["kafka", "apache kafka"]
+
+# ---- Practices --------------------------------------------------------------
+[[skill]]
+name = "Unit testing"
+category = "Practices"
+aliases = ["unit testing", "unit tests", "tdd", "test-driven development", "xunit", "nunit", "junit", "pytest", "jest",
+           "vitest", "automated testing"]
+
+[[skill]]
+name = "Agile"
+category = "Practices"
+aliases = ["agile", "scrum", "kanban", "sprints", "jira"]
+
+[[skill]]
+name = "OOP"
+category = "Practices"
+aliases = ["oop", "object-oriented", "object oriented", "object oriented programming", "solid principles",
+           "design patterns"]
+
+[[skill]]
+name = "Data structures & algorithms"
+category = "Practices"
+aliases = ["data structures", "algorithms", "data structures and algorithms"]
+
+# ---- Support / IT -----------------------------------------------------------
+[[skill]]
+name = "Networking"
+category = "IT Support"
+aliases = ["networking", "tcp/ip", "lan", "wan", "dns", "dhcp", "network troubleshooting", "ccna"]
+
+[[skill]]
+name = "Windows Server"
+category = "IT Support"
+aliases = ["windows server", "active directory", "group policy"]
+
+[[skill]]
+name = "Microsoft 365"
+category = "IT Support"
+aliases = ["microsoft 365", "office 365", "o365", "m365", "exchange server", "intune"]
+
+[[skill]]
+name = "Technical support"
+category = "IT Support"
+aliases = ["technical support", "desktop support", "it support", "helpdesk", "help desk", "service desk",
+           "troubleshooting", "itil"]
+
+# ---- Soft skills (commonly listed in South African job ads) -------------------
+[[skill]]
+name = "Communication"
+category = "Soft skills"
+aliases = ["communication skills", "written and verbal communication", "verbal and written communication",
+           "excellent communication", "good communication"]
+
+[[skill]]
+name = "Problem solving"
+category = "Soft skills"
+aliases = ["problem solving", "problem-solving", "analytical skills", "analytical thinking", "critical thinking"]
+
+[[skill]]
+name = "Teamwork"
+category = "Soft skills"
+aliases = ["teamwork", "team player", "work in a team", "work well in a team"]
+
+# ---- Qualifications -----------------------------------------------------------
+[[skill]]
+name = "Degree in IT / Computer Science"
+category = "Qualifications"
+aliases = ["bsc computer science", "computer science degree", "degree in computer science", "bsc it",
+           "bachelor's degree", "bachelors degree", "honours degree", "degree in information technology",
+           "information systems degree", "bcom informatics", "bsc in computer science", "bachelor of science"]
+
+[[skill]]
+name = "Diploma in IT"
+category = "Qualifications"
+aliases = ["diploma in it", "national diploma", "diploma in information technology", "it diploma",
+           "diploma in software development"]
+
+[[skill]]
+name = "Matric"
+category = "Qualifications"
+aliases = ["matric", "grade 12", "nsc", "national senior certificate"]
+
+[[skill]]
+name = "Driver's licence"
+category = "Qualifications"
+aliases = ["driver's licence", "drivers licence", "driver's license", "drivers license", "valid licence",
+           "code 8", "code 10", "code b"]
