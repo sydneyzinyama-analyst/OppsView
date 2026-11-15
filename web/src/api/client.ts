@@ -36,7 +36,9 @@ export function setUnauthorizedHandler(handler: () => void) {
 
 export async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const headers: Record<string, string> = { Accept: 'application/json' }
-  if (body !== undefined) headers['Content-Type'] = 'application/json'
+  // FormData (file uploads) sets its own multipart Content-Type with the boundary.
+  const isForm = body instanceof FormData
+  if (body !== undefined && !isForm) headers['Content-Type'] = 'application/json'
   const sentToken = token
   if (sentToken) headers.Authorization = `Bearer ${sentToken}`
 
@@ -45,7 +47,7 @@ export async function request<T>(method: string, path: string, body?: unknown): 
     response = await fetch(`${BASE_URL}${path}`, {
       method,
       headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
     })
   } catch {
     throw new ApiError(0, "Can't reach the OppsView API. Is it running?")
