@@ -137,4 +137,63 @@ public class RuleBasedEmailParserTests
         var parsed = _parser.Parse(Email(html));
         Assert.Equal((EmailKind.ApplicationReceived, "Yoco", "QA Tester"), (parsed.Kind, parsed.Company, parsed.Role));
     }
+
+    // ---- Company from the sender's address --------------------------------
+
+    [Fact]
+    public void Takes_the_company_from_the_address_when_the_email_does_not_name_it()
+    {
+        var parsed = _parser.Parse(Email("Thank you for applying for the Junior Developer position. We will be in touch.",
+            from: "noreply@entelect.co.za"));
+        Assert.Equal(("Entelect", "Junior Developer"), (parsed.Company, parsed.Role));
+    }
+
+    [Fact]
+    public void A_company_named_in_the_text_wins_over_the_address()
+    {
+        var parsed = _parser.Parse(Email("Thank you for applying for the Analyst role at Old Mutual.", from: "noreply@oldmutual.co.za"));
+        Assert.Equal("Old Mutual", parsed.Company);
+    }
+
+    [Fact]
+    public void The_senders_display_name_wins_over_the_address()
+    {
+        var parsed = _parser.Parse(Email("Thank you for your application.", from: "Standard Bank Careers <noreply@standardbank.co.za>"));
+        Assert.Equal("Standard Bank", parsed.Company);
+    }
+
+    // ---- Job-site marketing is not an application --------------------------
+    // Phrasing typical of job-site emails; replace with real samples when available.
+
+    [Theory]
+    [InlineData("Recommended jobs for you", "Based on your profile, these jobs might interest you. Junior Developer at Acme. Apply now!")]
+    [InlineData("New jobs matching your search", "3 new jobs matching Junior Developer in Johannesburg.")]
+    [InlineData("Is this your next job?", "Candidates like you also applied for: Software Developer at Globex. Apply now.")]
+    [InlineData("A recruiter viewed your profile", "Good news! A recruiter viewed your profile on Pnet.")]
+    [InlineData("Don't miss out", "Companies are actively hiring for roles like yours.")]
+    public void Job_site_recommendations_and_notifications_are_not_relevant(string subject, string body) =>
+        Assert.Equal(EmailKind.NotRelevant, _parser.Parse(Email(body, subject, from: "noreply@pnet.co.za")).Kind);
+
+    [Fact]
+    public void A_job_site_confirmation_that_also_lists_recommended_jobs_is_still_a_confirmation()
+    {
+        var body = "Your application for Junior Developer has been successfully sent. "
+                   + "Jobs you might also like: Tester at Acme. Apply now.";
+        Assert.Equal(EmailKind.ApplicationReceived, _parser.Parse(Email(body, from: "noreply@pnet.co.za")).Kind);
+    }
+
+    [Fact]
+    public void Vague_job_site_emails_are_ignored_rather_than_sent_for_review() =>
+        Assert.Equal(EmailKind.NotRelevant,
+            _parser.Parse(Email("Your candidate profile is 80% complete.", from: "noreply@pnet.co.za")).Kind);
+
+    [Fact]
+    public void Softer_wording_from_an_employer_is_still_a_confirmation() =>
+        Assert.Equal(EmailKind.ApplicationReceived,
+            _parser.Parse(Email("Thank you for your interest in the Developer position at Acme.", from: "hr@acme.co.za")).Kind);
+
+    [Fact]
+    public void Softer_wording_from_a_job_site_is_not() =>
+        Assert.Equal(EmailKind.NotRelevant,
+            _parser.Parse(Email("Thank you for your interest in Pnet Premium.", from: "noreply@pnet.co.za")).Kind);
 }

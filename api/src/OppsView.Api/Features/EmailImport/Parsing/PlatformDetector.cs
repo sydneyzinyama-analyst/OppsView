@@ -8,18 +8,21 @@ public static partial class PlatformDetector
 {
     public static JobPlatform? Detect(string senderAddress, string text)
     {
-        var domain = senderAddress.Split('@').LastOrDefault()?.ToLowerInvariant() ?? "";
+        var domain = SenderDomain.DomainOf(senderAddress) ?? "";
 
         if (IsDomain(domain, "pnet.co.za") || PnetPhrase().IsMatch(text)) return JobPlatform.Pnet;
-        if (domain.Contains("indeed") || IndeedPhrase().IsMatch(text)) return JobPlatform.Indeed;
-        if (domain.Contains("workable") || WorkablePhrase().IsMatch(text)) return JobPlatform.Workable;
+        if (IsDomain(domain, "indeed.com") || IndeedPhrase().IsMatch(text)) return JobPlatform.Indeed;
+        if (IsDomain(domain, "workable.com") || IsDomain(domain, "workablemail.com") || WorkablePhrase().IsMatch(text)) return JobPlatform.Workable;
         if (IsDomain(domain, "linkedin.com") || LinkedInPhrase().IsMatch(text)) return JobPlatform.LinkedIn;
 
         // Sent by the company itself or its hiring system (Workday,
         // SuccessFactors, Greenhouse...): applied through their own site.
-        if (domain.Length > 0 && !FreeMail().IsMatch(domain)) return JobPlatform.CompanyPortal;
-
-        return null;
+        return SenderDomain.Classify(senderAddress) switch
+        {
+            SenderDomain.Kind.Company or SenderDomain.Kind.HiringSystem or SenderDomain.Kind.MailService => JobPlatform.CompanyPortal,
+            SenderDomain.Kind.JobBoard => JobPlatform.Other,
+            _ => null,
+        };
     }
 
     private static bool IsDomain(string domain, string expected) =>
@@ -38,7 +41,4 @@ public static partial class PlatformDetector
 
     [GeneratedRegex(@"\bEasy Apply\b|\b(applied|application sent) (on|via|through) LinkedIn\b", RegexOptions.IgnoreCase)]
     private static partial Regex LinkedInPhrase();
-
-    [GeneratedRegex(@"^(gmail|googlemail|outlook|hotmail|live|yahoo|icloud|me|aol|proton|protonmail)\.")]
-    private static partial Regex FreeMail();
 }

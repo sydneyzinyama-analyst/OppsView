@@ -25,16 +25,31 @@ public sealed class EmailImporter(AppDbContext db, IEmailParser parser, TimeProv
     /// </summary>
     public static readonly TimeSpan SameApplicationWindow = TimeSpan.FromDays(60);
 
-    public async Task<ImportSummary> ImportAsync(Guid userId, IReadOnlyCollection<IncomingEmail> emails, CancellationToken ct)
+    /// <param name="recheck">
+    /// Message ids of emails that were left for review earlier and should be
+    /// read again (the parser may have improved since). Their old review
+    /// record is replaced. If they still need review they aren't counted
+    /// again, so the sync message only reports what's new.
+    /// </param>
+    public async Task<ImportSummary> ImportAsync(
+        Guid userId, IReadOnlyCollection<IncomingEmail> emails, CancellationToken ct, IReadOnlySet<string>? recheck = null)
     {
         if (emails.Count == 0) return ImportSummary.Empty;
+        recheck ??= new HashSet<string>();
 
         var ids = emails.Select(e => e.MessageId).ToList();
-        var alreadyProcessed = (await db.ImportedEmails
-                .Where(e => e.UserId == userId && ids.Contains(e.MessageId))
-                .Select(e => e.MessageId)
-                .ToListAsync(ct))
-            .ToHashSet();
+        var existing = await db.ImportedEmails
+            .Where(e => e.UserId == userId && ids.Contains(e.MessageId))
+            .ToListAsync(ct);
+
+        // Old review records for re-checked emails are replaced below, in the
+        // same SaveChanges (so a failed sync leaves them untouched).
+        var toRecheck = existing
+            .Where(e => recheck.Contains(e.MessageId) && e.Outcome == ImportOutcome.NeedsReview && e.ApplicationId is null)
+            .ToList();
+        db.ImportedEmails.RemoveRange(toRecheck);
+        var rechecking = toRecheck.Select(e => e.MessageId).ToHashSet();
+        var alreadyProcessed = existing.Select(e => e.MessageId).Where(id => !rechecking.Contains(id)).ToHashSet();
 
         // A personal tracker holds hundreds of applications at most, so
         // loading them once and matching in memory is simpler and faster than
@@ -55,7 +70,8 @@ public sealed class EmailImporter(AppDbContext db, IEmailParser parser, TimeProv
             var (outcome, application, reason) = Apply(userId, email, parsed, applications, now);
 
             db.ImportedEmails.Add(ImportedEmail.Record(userId, email, parsed, outcome, application?.Id, reason, now));
-            counts[outcome] = counts.GetValueOrDefault(outcome) + 1;
+            var stillUnclear = rechecking.Contains(email.MessageId) && outcome == ImportOutcome.NeedsReview;
+            if (!stillUnclear) counts[outcome] = counts.GetValueOrDefault(outcome) + 1;
         }
 
         // One SaveChanges = one transaction: a sync is applied completely or

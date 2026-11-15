@@ -20,11 +20,12 @@ public sealed class RuleBasedEmailParser : IEmailParser
         var sentences = EmailText.Sentences(text);
         var subject = EmailText.Clean(email.Subject);
 
-        var kind = EmailClassifier.Classify(subject, sentences);
+        var (senderName, senderAddress) = SplitSender(email.Sender);
+
+        var kind = EmailClassifier.Classify(subject, sentences, SenderDomain.IsJobBoard(senderAddress));
         if (kind is EmailKind.NotRelevant) return new ParsedEmail(kind);
 
-        var (senderName, senderAddress) = SplitSender(email.Sender);
-        var (company, role) = DetailsExtractor.Extract(subject, sentences, senderName);
+        var (company, role) = DetailsExtractor.Extract(subject, sentences, senderName, senderAddress);
         var platform = PlatformDetector.Detect(senderAddress, text);
 
         return new ParsedEmail(kind, platform, company, role);

@@ -10,7 +10,8 @@ namespace OppsView.Api.Features.EmailImport.Parsing;
 /// </summary>
 public static partial class DetailsExtractor
 {
-    public static (string? Company, string? Role) Extract(string subject, IReadOnlyList<string> sentences, string? senderName)
+    public static (string? Company, string? Role) Extract(
+        string subject, IReadOnlyList<string> sentences, string? senderName, string? senderAddress = null)
     {
         string? company = null, role = null;
 
@@ -30,10 +31,13 @@ public static partial class DetailsExtractor
         // 2. Role on its own ("Your application for X has been sent").
         role ??= FirstMatch(sentences.Prepend(subject), RoleOnly(), "role", CleanRole);
 
-        // 3. Company on its own: phrases, then the sign-off, then the sender's name.
+        // 3. Company on its own, most reliable first: a phrase naming it, the
+        //    sender's display name ("Discovery Careers"), the sender's address
+        //    (careers@discovery.co.za), and last the sign-off.
         company ??= FirstMatch(sentences.Prepend(subject), CompanyOnly(), "company", CleanCompany)
-            ?? FromSignOff(sentences)
-            ?? CleanCompany(senderName);
+            ?? CleanCompany(senderName)
+            ?? SenderDomain.CompanyFrom(senderAddress)
+            ?? FromSignOff(sentences);
 
         return (company, role);
     }
@@ -53,7 +57,11 @@ public static partial class DetailsExtractor
     ];
 
     // "Your application for Junior AI & Full-Stack Developer has been successfully sent"
-    [GeneratedRegex(@"\byour\s+application\s+(?:for|to)\s+(?:the\s+)?(?<role>.{2,100}?)\s+(?:has\s+been|was|is)\b", RegexOptions.IgnoreCase)]
+    // "Thank you for applying for the Junior Developer position."
+    [GeneratedRegex(
+        @"\byour\s+application\s+(?:for|to)\s+(?:the\s+)?(?<role>.{2,100}?)\s+(?:has\s+been|was|is)\b" +
+        @"|\b(?:apply|applying|applied|application)\s+(?:for|to)\s+(?:the\s+)?(?:position\s+of\s+)?(?<role>.{2,100}?)\s+(?:position|role|vacancy|job|post|opportunity)\b",
+        RegexOptions.IgnoreCase)]
     private static partial Regex RoleOnly();
 
     // "Thank you for choosing FutureSoft", "your interest in joining Acme"
