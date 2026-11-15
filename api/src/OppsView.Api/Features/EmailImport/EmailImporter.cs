@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using OppsView.Api.Data;
 using OppsView.Api.Domain;
+using OppsView.Api.Features.EmailImport.Parsing;
 
 namespace OppsView.Api.Features.EmailImport;
 
@@ -114,6 +115,16 @@ public sealed class EmailImporter(AppDbContext db, IEmailParser parser, TimeProv
 
     public static bool IsPlaceholder(string value) => value is UnknownCompany or UnknownRole;
 
+    /// <summary>Start of the note on applications created with a missing detail.</summary>
+    private const string ProvisionalNotePrefix = "The email didn't";
+
+    /// <summary>
+    /// The company isn't really known yet: a placeholder, or the job site /
+    /// hiring system the email came from ("Pnet").
+    /// </summary>
+    private static bool IsProvisionalCompany(string company) =>
+        company == UnknownCompany || SenderDomain.IsIntermediaryName(company);
+
     private (ImportOutcome, JobApplication?, string?) ApplyNewApplication(
         Guid userId, IncomingEmail email, ParsedEmail parsed, List<JobApplication> applications, DateTime now)
     {
@@ -131,8 +142,11 @@ public sealed class EmailImporter(AppDbContext db, IEmailParser parser, TimeProv
         if (existing is not null)
             return (ImportOutcome.NoChange, existing, "This application is already in OppsView.");
 
-        var missing = parsed.Company is null ? "company" : parsed.Role is null ? "job title" : null;
-        var notes = missing is null ? null : $"The email didn't say the {missing}. Click Edit to fill it in.";
+        var notes =
+            parsed.Company is null ? $"{ProvisionalNotePrefix} say the company. Click Edit to fill it in."
+            : SenderDomain.IsIntermediaryName(company) ? $"{ProvisionalNotePrefix} name the employer (it came from {company}). Click Edit to fill it in."
+            : parsed.Role is null ? $"{ProvisionalNotePrefix} say the job title. Click Edit to fill it in."
+            : null;
 
         try
         {
@@ -183,20 +197,20 @@ public sealed class EmailImporter(AppDbContext db, IEmailParser parser, TimeProv
             if (open.Count > 0) candidates = open;
         }
 
-        if (candidates.Count == 0 && parsed.Role is not null)
+        if (candidates.Count == 0 && parsed.Role is not null && !IsProvisionalCompany(parsed.Company))
         {
-            // E.g. a Pnet confirmation created "Unknown company - IT Support
-            // Technician"; now Cartrack writes about that job title. If exactly
-            // one such application exists, it's this one: fill in the company.
-            var unnamed = applications
-                .Where(a => a.Company == UnknownCompany && SameRole(a.Role, parsed.Role))
+            // E.g. a Pnet confirmation created "Pnet - IT Support Technician";
+            // now Cartrack writes about that job title. If exactly one such
+            // application exists, it's this one: put in the real employer.
+            var provisional = applications
+                .Where(a => IsProvisionalCompany(a.Company) && SameRole(a.Role, parsed.Role))
                 .ToList();
-            if (unnamed.Count == 1)
+            if (provisional.Count == 1)
             {
-                var a = unnamed[0];
+                var a = provisional[0];
                 a.UpdateDetails(parsed.Company, a.Role, a.Platform, a.AppliedOn, a.JobUrl,
-                    a.Notes?.StartsWith("The email didn't say") == true ? null : a.Notes, email.ReceivedAt);
-                candidates = unnamed;
+                    a.Notes?.StartsWith(ProvisionalNotePrefix) == true ? null : a.Notes, email.ReceivedAt);
+                candidates = provisional;
             }
         }
 

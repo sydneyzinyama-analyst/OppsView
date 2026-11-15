@@ -206,7 +206,9 @@ public class RuleBasedEmailParserTests
             subject: "Your Application to [2] Intermediate Java (Springboot) + Angular Fullstack Developer",
             from: "Roxanne Kellerman <roxanne.kellerman@mail.manatal.com>"));
 
-        Assert.Null(parsed.Company); // manatal is a hiring system, Roxanne is a person
+        // Roxanne is a person, not the company; the email came through the
+        // Manatal hiring system, which is the best name available.
+        Assert.Equal("Manatal", parsed.Company);
         Assert.Equal("Intermediate Java (Springboot) + Angular Fullstack Developer", parsed.Role);
     }
 
@@ -239,7 +241,8 @@ public class RuleBasedEmailParserTests
         var parsed = _parser.Parse(Email("",
             subject: "Sydney, your application for Industrial Software Developer has been sent", from: "Pnet <info@info.pnet.co.za>"));
 
-        Assert.Equal((EmailKind.ApplicationReceived, null, "Industrial Software Developer", JobPlatform.Pnet),
+        // Pnet never names the employer, so the company is the sender: Pnet.
+        Assert.Equal((EmailKind.ApplicationReceived, "Pnet", "Industrial Software Developer", JobPlatform.Pnet),
             (parsed.Kind, parsed.Company, parsed.Role, parsed.Platform));
     }
 
@@ -258,4 +261,16 @@ public class RuleBasedEmailParserTests
     public void An_unclear_email_about_your_application_still_goes_to_review() =>
         Assert.Equal(EmailKind.Unknown, _parser.Parse(Email("",
             subject: "Important information about your application to Nintex", from: "careers@nintex.com")).Kind);
+
+    [Theory]
+    [InlineData("Pnet <info@info.pnet.co.za>", "Pnet")]
+    [InlineData("jobs-noreply@linkedin.com", "LinkedIn")]
+    [InlineData("noreply@successfactors.eu", "SuccessFactors")]
+    [InlineData("noreply@kardee.com", "Kardee")]
+    public void Without_anything_better_the_company_is_whoever_sent_the_email(string from, string expected) =>
+        Assert.Equal(expected, _parser.Parse(Email("", "Your application for Data Analyst has been sent", from)).Company);
+
+    [Fact]
+    public void Personal_mail_addresses_never_become_the_company() =>
+        Assert.Null(_parser.Parse(Email("", "Your application for Data Analyst has been sent", "someone@gmail.com")).Company);
 }

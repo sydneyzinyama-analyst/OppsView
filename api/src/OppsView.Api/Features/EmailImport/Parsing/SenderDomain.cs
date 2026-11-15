@@ -81,6 +81,51 @@ public static class SenderDomain
 
     public static bool IsJobBoard(string? address) => Classify(address) == Kind.JobBoard;
 
+    // Proper names for job sites and hiring systems, where the domain alone
+    // would give the wrong capitalisation ("Linkedin", "Successfactors").
+    private static readonly Dictionary<string, string> IntermediaryNames = new()
+    {
+        ["pnet.co.za"] = "Pnet", ["indeed.com"] = "Indeed", ["linkedin.com"] = "LinkedIn", ["workable.com"] = "Workable",
+        ["workablemail.com"] = "Workable", ["careerjunction.co.za"] = "CareerJunction", ["careers24.com"] = "Careers24",
+        ["jobmail.co.za"] = "Jobmail", ["glassdoor.com"] = "Glassdoor", ["offerzen.com"] = "OfferZen", ["jobvine.co.za"] = "JobVine",
+        ["executiveplacements.com"] = "Executive Placements", ["ziprecruiter.com"] = "ZipRecruiter",
+        ["myworkday.com"] = "Workday", ["myworkdayjobs.com"] = "Workday", ["workday.com"] = "Workday",
+        ["successfactors.com"] = "SuccessFactors", ["successfactors.eu"] = "SuccessFactors", ["sapsf.com"] = "SuccessFactors",
+        ["sapsf.eu"] = "SuccessFactors", ["greenhouse.io"] = "Greenhouse", ["greenhouse-mail.io"] = "Greenhouse", ["lever.co"] = "Lever",
+        ["smartrecruiters.com"] = "SmartRecruiters", ["bamboohr.com"] = "BambooHR", ["teamtailor.com"] = "Teamtailor",
+        ["teamtailor-mail.com"] = "Teamtailor", ["icims.com"] = "iCIMS", ["oraclecloud.com"] = "Oracle Recruiting",
+        ["zohorecruit.com"] = "Zoho Recruit", ["jobjack.co.za"] = "JobJack", ["ashbyhq.com"] = "Ashby", ["manatal.com"] = "Manatal",
+    };
+
+    // Every job site / hiring system name, for recognising a provisional company.
+    private static readonly HashSet<string> AllIntermediaryNames = JobBoards.Concat(HiringSystems)
+        .Select(d => IntermediaryNames.TryGetValue(d, out var name) ? name : Prettify(d.Split('.')[0]))
+        .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Last resort for the company: the name of whoever sent the email, even
+    /// if that's a job site or hiring system (info@info.pnet.co.za -> "Pnet").
+    /// Null only for personal and bulk-mail addresses, which say nothing.
+    /// </summary>
+    public static string? SenderOrganisation(string? address)
+    {
+        var domain = DomainOf(address);
+        var kind = Classify(address);
+        if (domain is null || kind is Kind.None or Kind.PersonalMail or Kind.MailService) return null;
+        if (CompanyFrom(address) is { } company) return company;
+
+        var known = IntermediaryNames.FirstOrDefault(n => domain == n.Key || domain.EndsWith("." + n.Key, StringComparison.Ordinal));
+        if (known.Value is not null) return known.Value;
+
+        var labels = domain.Split('.');
+        var suffixLength = labels.Length >= 3 && SecondLevel.Contains(labels[^2]) ? 2 : 1;
+        var label = labels.Length > suffixLength ? labels[labels.Length - suffixLength - 1] : null;
+        return label is null || GenericLabels.Contains(label) ? null : Prettify(label);
+    }
+
+    /// <summary>"Pnet", "LinkedIn", "Workday"...: a go-between, not the employer.</summary>
+    public static bool IsIntermediaryName(string? name) => name is not null && AllIntermediaryNames.Contains(name.Trim());
+
     /// <summary>
     /// The company name implied by the sender's address, or null when the
     /// address belongs to a job site, mail provider or similar.

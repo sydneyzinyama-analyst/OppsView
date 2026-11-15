@@ -168,6 +168,33 @@ public sealed class EmailImporterTests : IDisposable
     }
 
     [Fact]
+    public async Task An_application_named_after_the_job_site_gets_the_real_employer_later()
+    {
+        // The parser gives "Pnet" when Pnet's confirmation names no employer.
+        await ImportAsync(Email(Received(company: "Pnet", role: "Industrial Software Developer"), daysAgo: 5));
+        var created = Applications().Single();
+        Assert.Contains("came from Pnet", created.Notes);
+
+        var summary = await ImportAsync(Email(Says(EmailKind.InterviewInvite, company: "Bosch", role: "Industrial Software Developer")));
+
+        Assert.Equal(1, summary.Updated);
+        var app = Applications().Single();
+        Assert.Equal(("Bosch", ApplicationStatus.Interview, JobPlatform.Pnet), (app.Company, app.Status, app.Platform));
+        Assert.Null(app.Notes);
+    }
+
+    [Fact]
+    public async Task A_status_email_from_the_job_site_itself_does_not_rename_anything()
+    {
+        await ImportAsync(Email(Received(company: "Pnet", role: "Developer"), daysAgo: 5));
+
+        var summary = await ImportAsync(Email(Says(EmailKind.ApplicationViewed, company: "Pnet", role: "Developer")));
+
+        Assert.Equal(1, summary.Updated);
+        Assert.Equal(("Pnet", ApplicationStatus.Viewed), (Applications().Single().Company, Applications().Single().Status));
+    }
+
+    [Fact]
     public async Task Two_unnamed_applications_with_the_same_title_are_not_guessed_between()
     {
         await ImportAsync(Email(Received(company: null, role: "Developer"), daysAgo: 100));

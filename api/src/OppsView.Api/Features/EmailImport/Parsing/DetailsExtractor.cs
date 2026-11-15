@@ -36,11 +36,15 @@ public static partial class DetailsExtractor
 
         // 3. Company on its own, most reliable first: a phrase naming it, the
         //    sender's display name ("Discovery Careers"), the sender's address
-        //    (careers@discovery.co.za), and last the sign-off.
+        //    (careers@discovery.co.za), the sign-off, and finally the name of
+        //    the job site or system that sent it.
         company ??= FirstMatch(sentences.Prepend(subject), CompanyOnly(), "company", CleanCompany)
             ?? (IsPersonName(senderName, senderAddress) ? null : CleanCompany(senderName))
             ?? SenderDomain.CompanyFrom(senderAddress)
-            ?? FromSignOff(sentences);
+            ?? FromSignOff(sentences)
+            // Nothing better: whoever sent it, even a job site ("Pnet").
+            // The importer swaps it for the real employer when one writes.
+            ?? SenderDomain.SenderOrganisation(senderAddress);
 
         return (company, role);
     }
