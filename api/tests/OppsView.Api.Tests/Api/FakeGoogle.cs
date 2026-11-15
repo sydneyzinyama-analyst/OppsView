@@ -19,6 +19,12 @@ public sealed class FakeGoogle : IGoogleOAuthClient, IGmailApi
     public Dictionary<string, IncomingEmail> Mailbox { get; } = [];
     public int MessagesFetched { get; private set; }
 
+    /// <summary>Messages Gmail will refuse to return, with the error to throw.</summary>
+    public Dictionary<string, Exception> FailingMessages { get; } = [];
+
+    /// <summary>When set, the inbox search fails with this.</summary>
+    public Exception? SearchFailure { get; set; }
+
     public string BuildAuthorizationUrl(string state, string codeChallenge) =>
         $"https://accounts.google.com/o/oauth2/v2/auth?state={Uri.EscapeDataString(state)}&code_challenge={codeChallenge}";
 
@@ -41,12 +47,14 @@ public sealed class FakeGoogle : IGoogleOAuthClient, IGmailApi
     public Task<IReadOnlyList<string>> SearchMessageIdsAsync(string accessToken, string query, int max, CancellationToken ct)
     {
         Queries.Add(query);
+        if (SearchFailure is not null) throw SearchFailure;
         return Task.FromResult<IReadOnlyList<string>>(Mailbox.Keys.Take(max).ToList());
     }
 
     public Task<IncomingEmail> GetMessageAsync(string accessToken, string messageId, CancellationToken ct)
     {
         MessagesFetched++;
+        if (FailingMessages.TryGetValue(messageId, out var failure)) throw failure;
         return Task.FromResult(Mailbox[messageId]);
     }
 }

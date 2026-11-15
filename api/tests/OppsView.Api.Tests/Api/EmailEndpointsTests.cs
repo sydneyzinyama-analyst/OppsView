@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using OppsView.Api.Data;
 using OppsView.Api.Features.Applications;
 using OppsView.Api.Features.EmailImport;
+using OppsView.Api.Features.EmailImport.Gmail;
 
 namespace OppsView.Api.Tests.Api;
 
@@ -202,8 +203,8 @@ public class EmailEndpointsTests(OppsViewApiFactory factory) : ApiTestBase(facto
         var app = await created.Content.ReadFromJsonAsync<ApplicationResponse>(Json);
         Assert.Equal(ApplicationStatus.Rejected, app!.Status); // the email was a rejection
         Assert.Equal(HttpStatusCode.NoContent, dismissed.StatusCode);
-        Assert.Empty((await client.GetFromJsonAsync<List<ReviewItemResponse>>("/email/review", Json))!
-            .Where(i => i.Id == rejection.Id || i.Id == unclear.Id));
+        Assert.DoesNotContain((await client.GetFromJsonAsync<List<ReviewItemResponse>>("/email/review", Json))!,
+            i => i.Id == rejection.Id || i.Id == unclear.Id);
 
         // Dealt with already: a second decision is refused.
         Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsync($"/email/review/{unclear.Id}/dismiss", null)).StatusCode);
@@ -249,5 +250,104 @@ public class EmailEndpointsTests(OppsViewApiFactory factory) : ApiTestBase(facto
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, (await client.PostAsync("/email/google/connect", null)).StatusCode);
         Assert.False((await client.GetFromJsonAsync<EmailStatusResponse>("/email/status", Json))!.Available);
+    }
+
+    // ---- Gmail errors (the 403 seen on a real mailbox) -------------------
+
+    [Fact]
+    public async Task An_email_Gmail_refuses_is_skipped_and_retried_next_time_without_failing_the_sync()
+    {
+        var client = await SignedInClientAsync();
+        await ConnectAsync(client);
+        var id = Guid.NewGuid().ToString("N");
+        AddToMailbox($"{id}-ok", "Thanks", "Thank you for applying for the Analyst role at Absa.");
+        AddToMailbox($"{id}-bad", "Thanks", "Thank you for applying for the Engineer role at Takealot.");
+        Factory.Google.FailingMessages[$"{id}-bad"] = new GmailApiException(403, "forbidden", "Not allowed");
+        try
+        {
+            var first = await client.PostAsync("/email/sync", null);
+            var summary = await first.Content.ReadFromJsonAsync<ImportSummary>(Json);
+
+            Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+            Assert.Equal(1, summary!.Failed);
+            var apps = (await client.GetFromJsonAsync<List<ApplicationResponse>>("/applications", Json))!;
+            Assert.Contains(apps, a => a.Company == "Absa");
+            Assert.Null((await StatusAsync(client)).LastSyncedAt); // not marked as fully synced
+        }
+        finally
+        {
+            Factory.Google.FailingMessages.Clear();
+        }
+
+        // Next sync: Gmail cooperates, and the skipped email is imported.
+        await client.PostAsync("/email/sync", null);
+        var after = (await client.GetFromJsonAsync<List<ApplicationResponse>>("/applications", Json))!;
+        Assert.Contains(after, a => a.Company == "Takealot");
+    }
+
+    [Fact]
+    public async Task Being_rate_limited_stops_fetching_and_keeps_what_was_read()
+    {
+        var client = await SignedInClientAsync();
+        await ConnectAsync(client);
+        var id = Guid.NewGuid().ToString("N");
+        AddToMailbox($"{id}-a", "Thanks", "Thank you for applying for the Analyst role at Nedbank.");
+        AddToMailbox($"{id}-b", "Thanks", "Thank you for applying for the Tester role at Investec.");
+        Factory.Google.FailingMessages[$"{id}-b"] = new GmailApiException(429, "rateLimitExceeded", "Too many requests");
+        try
+        {
+            var response = await client.PostAsync("/email/sync", null);
+            var summary = await response.Content.ReadFromJsonAsync<ImportSummary>(Json);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.True(summary!.Failed >= 1);
+            Assert.Contains((await client.GetFromJsonAsync<List<ApplicationResponse>>("/applications", Json))!, a => a.Company == "Nedbank");
+        }
+        finally
+        {
+            Factory.Google.FailingMessages.Clear();
+        }
+    }
+
+    [Fact]
+    public async Task Revoked_access_while_reading_messages_asks_the_user_to_reconnect()
+    {
+        var client = await SignedInClientAsync();
+        await ConnectAsync(client);
+        var id = Guid.NewGuid().ToString("N");
+        AddToMailbox($"{id}-x", "Thanks", "Thank you for applying for the Analyst role at Absa.");
+        Factory.Google.FailingMessages[$"{id}-x"] = new GmailAccessRevokedException();
+        try
+        {
+            var response = await client.PostAsync("/email/sync", null);
+
+            Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+            Assert.True((await StatusAsync(client)).NeedsReconnect);
+        }
+        finally
+        {
+            Factory.Google.FailingMessages.Clear();
+        }
+    }
+
+    [Fact]
+    public async Task A_Gmail_error_while_searching_is_a_clear_502_not_a_crash()
+    {
+        var client = await SignedInClientAsync();
+        await ConnectAsync(client);
+        Factory.Google.SearchFailure = new GmailApiException(429, "userRateLimitExceeded", "Slow down");
+        try
+        {
+            var response = await client.PostAsync("/email/sync", null);
+            var problem = await response.Content.ReadFromJsonAsync<Microsoft.AspNetCore.Mvc.ProblemDetails>(Json);
+
+            Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
+            Assert.Contains("slow down", problem!.Title, StringComparison.OrdinalIgnoreCase);
+            Assert.False((await StatusAsync(client)).NeedsReconnect);
+        }
+        finally
+        {
+            Factory.Google.SearchFailure = null;
+        }
     }
 }
