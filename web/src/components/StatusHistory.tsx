@@ -36,13 +36,18 @@ export function StatusHistory({ application }: Props) {
   return (
     <ol className="timeline" aria-label={`Status history for ${company}`}>
       <li>
-        <StatusBadge status="Applied" /> <span className="muted">added {formatDateTime(createdAt)}</span>
+        <StatusBadge status="Applied" />{' '}
+        <span className="muted">
+          added {formatDateTime(createdAt)}
+          {application.source === 'Email' && ' (from email)'}
+        </span>
       </li>
       {loaded.history.map((h) => (
         <li key={h.changedAt + h.toStatus}>
           <StatusBadge status={h.toStatus} />{' '}
           <span className="muted">
             from {h.fromStatus}, {formatDateTime(h.changedAt)}
+            {h.source === 'Email' && ' (from email)'}
           </span>
         </li>
       ))}

@@ -23,6 +23,11 @@ describe('ApplicationList', () => {
     expect(screen.getByText(/No applications yet/)).toBeInTheDocument()
   })
 
+  it('labels applications that came from email', () => {
+    renderList({ applications: [makeApplication({ source: 'Email' })] })
+    expect(screen.getByText('from email')).toBeInTheDocument()
+  })
+
   it('renders a row per application and links to the job ad', () => {
     renderList()
     expect(screen.getByText('Acme')).toBeInTheDocument()

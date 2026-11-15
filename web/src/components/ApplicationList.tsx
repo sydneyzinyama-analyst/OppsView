@@ -68,6 +68,11 @@ export function ApplicationList({ applications, onUpdate, onDelete, onChangeStat
                     ) : (
                       a.company
                     )}
+                    {a.source === 'Email' && (
+                      <span className="source-tag" title="Added automatically from an email">
+                        from email
+                      </span>
+                    )}
                   </td>
                   <td data-label="Role">{a.role}</td>
                   <td data-label="Platform">{PLATFORM_LABELS[a.platform]}</td>
