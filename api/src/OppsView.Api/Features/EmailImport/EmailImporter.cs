@@ -132,6 +132,12 @@ public sealed class EmailImporter(AppDbContext db, IEmailParser parser, TimeProv
         if (parsed.Company is null) return Review($"Looks like a {label} email, but the company name wasn't found.");
 
         var candidates = applications.Where(a => CompanyName.AreSame(a.Company, parsed.Company)).ToList();
+        if (candidates.Count == 0)
+        {
+            // "BBD" in the email, "BBD Software" typed by the user. Accepted
+            // only if it points at a single application (checked below).
+            candidates = applications.Where(a => CompanyName.StartsWithSameWords(a.Company, parsed.Company)).ToList();
+        }
         if (parsed.Role is not null && candidates.Count > 1)
         {
             var sameRole = candidates.Where(a => SameRole(a.Role, parsed.Role)).ToList();

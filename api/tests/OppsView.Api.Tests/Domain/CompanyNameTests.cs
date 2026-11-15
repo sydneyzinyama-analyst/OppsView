@@ -33,4 +33,14 @@ public class CompanyNameTests
     {
         Assert.False(CompanyName.AreSame(name, name));
     }
+
+    [Theory]
+    [InlineData("BBD", "BBD Software", true)]
+    [InlineData("Discovery Health", "Discovery", true)]
+    [InlineData("Acme (Pty) Ltd", "ACME Labs", true)]
+    [InlineData("Software BBD", "BBD", false)]
+    [InlineData("Absa", "Capitec", false)]
+    [InlineData("", "Acme", false)]
+    public void Loose_match_accepts_extra_words_on_the_end(string a, string b, bool expected) =>
+        Assert.Equal(expected, CompanyName.StartsWithSameWords(a, b));
 }

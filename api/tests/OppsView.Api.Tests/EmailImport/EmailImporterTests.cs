@@ -181,6 +181,28 @@ public sealed class EmailImporterTests : IDisposable
     }
 
     [Fact]
+    public async Task A_shorter_or_longer_company_name_matches_when_it_is_the_only_candidate()
+    {
+        await AddManualAsync("BBD Software");
+
+        var summary = await ImportAsync(Email(Says(EmailKind.Rejection, company: "BBD")));
+
+        Assert.Equal(1, summary.Updated);
+        Assert.Equal(ApplicationStatus.Rejected, Applications().Single().Status);
+    }
+
+    [Fact]
+    public async Task A_loose_company_match_with_several_candidates_needs_review()
+    {
+        await AddManualAsync("Discovery Health");
+        await AddManualAsync("Discovery Bank");
+
+        var summary = await ImportAsync(Email(Says(EmailKind.Rejection, company: "Discovery")));
+
+        Assert.Equal(1, summary.NeedsReview);
+    }
+
+    [Fact]
     public async Task A_status_email_for_an_unknown_company_needs_review()
     {
         var summary = await ImportAsync(Email(Says(EmailKind.Rejection, company: "Globex"), messageId: "m1"));
