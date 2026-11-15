@@ -23,13 +23,13 @@ This repository is a portfolio project, built in phases. Each phase adds a servi
 
 ```
  Browser                       ASP.NET Core 10 API                    PostgreSQL
-┌──────────────┐  HTTPS/JSON  ┌──────────────────────────────────┐   ┌────────────────┐
-│ React + Vite │ ───────────▶ │ Controllers (thin)               │   │ Users          │
-│  :5173       │  Bearer JWT  │   → Services (use cases, scoped  │──▶│ Applications   │
-│              │ ◀─────────── │       to the signed-in user)     │   │ StatusHistory  │
-└──────────────┘              │   → Domain (entities + rules)    │   │ ImportedEmails │
-                              │   → EF Core (AppDbContext)       │   │ GmailConnections│
-                              │                                  │   └────────────────┘
+┌──────────────┐  HTTPS/JSON  ┌──────────────────────────────────┐   ┌──────────────────┐
+│ React + Vite │ ───────────▶ │ Controllers (thin)               │   │ Users            │
+│  :5173       │  Bearer JWT  │   → Services (use cases, scoped  │──▶│ Applications     │
+│              │ ◀─────────── │       to the signed-in user)     │   │ StatusHistory    │
+└──────────────┘              │   → Domain (entities + rules)    │   │ ImportedEmails   │
+                              │   → EF Core (AppDbContext)       │   │ GmailConnections │
+                              │                                  │   └──────────────────┘
                               │ Email import:                    │
                               │   Gmail API → parser → importer ─┼──▶ Google (read-only)
                               │  :5226                           │
