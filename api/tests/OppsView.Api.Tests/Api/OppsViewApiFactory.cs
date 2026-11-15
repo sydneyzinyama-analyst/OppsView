@@ -6,7 +6,9 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Time.Testing;
+using Microsoft.AspNetCore.DataProtection;
 using OppsView.Api.Data;
+using OppsView.Api.Features.EmailImport.Gmail;
 
 namespace OppsView.Api.Tests.Api;
 
@@ -31,10 +33,15 @@ public sealed class OppsViewApiFactory : WebApplicationFactory<Program>
 
     public FakeTimeProvider Time { get; } = new(StartTime);
 
+    /// <summary>Pretend Google (OAuth + Gmail) for the email import tests.</summary>
+    public FakeGoogle Google { get; } = new();
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
         builder.UseSetting("Jwt:SigningKey", "test-signing-key-that-is-at-least-32-chars");
+        builder.UseSetting("Google:ClientId", "test-client-id");
+        builder.UseSetting("Google:ClientSecret", "test-client-secret");
 
         builder.ConfigureServices(services =>
         {
@@ -47,6 +54,14 @@ public sealed class OppsViewApiFactory : WebApplicationFactory<Program>
 
             services.RemoveAll<TimeProvider>();
             services.AddSingleton<TimeProvider>(Time);
+
+            services.RemoveAll<IGoogleOAuthClient>();
+            services.RemoveAll<IGmailApi>();
+            services.AddSingleton<IGoogleOAuthClient>(Google);
+            services.AddSingleton<IGmailApi>(Google);
+
+            // Encryption keys in memory only, instead of the user profile.
+            services.AddDataProtection().UseEphemeralDataProtectionProvider();
         });
     }
 

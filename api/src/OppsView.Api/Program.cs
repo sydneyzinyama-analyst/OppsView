@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.ModelBinding.Metadata;
 using Microsoft.EntityFrameworkCore;
@@ -11,6 +12,9 @@ using OppsView.Api.Data;
 using OppsView.Api.Domain;
 using OppsView.Api.Features.Applications;
 using OppsView.Api.Features.Auth;
+using OppsView.Api.Features.EmailImport;
+using OppsView.Api.Features.EmailImport.Gmail;
+using OppsView.Api.Features.EmailImport.Parsing;
 using OppsView.Api.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -77,6 +81,23 @@ builder.Services.AddScoped<IApplicationService, ApplicationService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddSingleton<ITokenService, TokenService>();
 builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
+
+// ---- Email import (Gmail) ----------------------------------------------
+// Optional: without Google:ClientId/ClientSecret the app runs normally and
+// the email endpoints report that Gmail isn't set up.
+builder.Services.AddOptions<GoogleOptions>().BindConfiguration(GoogleOptions.SectionName);
+// Data Protection encrypts the stored Gmail tokens and the OAuth state. Keys
+// live in the user profile locally (%LOCALAPPDATA%\ASP.NET\DataProtection-Keys).
+builder.Services.AddDataProtection().SetApplicationName("OppsView");
+// AddHttpClient<TInterface, TImpl> = a typed HttpClient managed by the
+// framework (pooled connections, no socket exhaustion).
+builder.Services.AddHttpClient<IGoogleOAuthClient, GoogleOAuthClient>();
+builder.Services.AddHttpClient<IGmailApi, GmailApi>();
+builder.Services.AddSingleton<OAuthStateProtector>();
+builder.Services.AddSingleton<IEmailParser, RuleBasedEmailParser>();
+builder.Services.AddScoped<EmailImporter>();
+builder.Services.AddScoped<GmailSyncService>();
+builder.Services.AddScoped<ReviewService>();
 
 // ---- HTTP / JSON -------------------------------------------------------
 builder.Services

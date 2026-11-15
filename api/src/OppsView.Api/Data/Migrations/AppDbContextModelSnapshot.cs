@@ -22,6 +22,34 @@ namespace OppsView.Api.Data.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("OppsView.Api.Domain.GmailConnection", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("ConnectedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EmailAddress")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)");
+
+                    b.Property<string>("EncryptedRefreshToken")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("LastSyncedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("NeedsReconnect")
+                        .HasColumnType("boolean");
+
+                    b.HasKey("UserId");
+
+                    b.ToTable("GmailConnections", (string)null);
+                });
+
             modelBuilder.Entity("OppsView.Api.Domain.ImportedEmail", b =>
                 {
                     b.Property<Guid>("Id")
@@ -205,6 +233,15 @@ namespace OppsView.Api.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("Users", (string)null);
+                });
+
+            modelBuilder.Entity("OppsView.Api.Domain.GmailConnection", b =>
+                {
+                    b.HasOne("OppsView.Api.Domain.User", null)
+                        .WithOne()
+                        .HasForeignKey("OppsView.Api.Domain.GmailConnection", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("OppsView.Api.Domain.ImportedEmail", b =>
