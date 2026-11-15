@@ -128,17 +128,63 @@ public sealed class EmailImporterTests : IDisposable
         Assert.Equal(2, Applications().Count);
     }
 
-    [Theory]
-    [InlineData(null, "Developer")]
-    [InlineData("Acme", null)]
-    [InlineData("  ", "Developer")]
-    public async Task A_confirmation_without_company_or_role_needs_review(string? company, string? role)
+    [Fact]
+    public async Task A_confirmation_with_neither_company_nor_role_needs_review()
     {
-        var summary = await ImportAsync(Email(Received(company, role), messageId: "m1"));
+        var summary = await ImportAsync(Email(Received(company: null, role: null), messageId: "m1"));
 
         Assert.Equal(1, summary.NeedsReview);
         Assert.Empty(Applications());
         Assert.NotNull(Imported("m1").Reason);
+    }
+
+    [Theory]
+    [InlineData(null, "Developer", "Unknown company", "Developer", "company")]
+    [InlineData("  ", "Developer", "Unknown company", "Developer", "company")]
+    [InlineData("Acme", null, "Acme", "Unknown role", "job title")]
+    public async Task A_confirmation_missing_one_detail_is_still_tracked_with_a_placeholder(
+        string? company, string? role, string expectedCompany, string expectedRole, string missing)
+    {
+        var summary = await ImportAsync(Email(Received(company, role)));
+
+        Assert.Equal(1, summary.Created);
+        var app = Applications().Single();
+        Assert.Equal((expectedCompany, expectedRole), (app.Company, app.Role));
+        Assert.Contains(missing, app.Notes);
+    }
+
+    [Fact]
+    public async Task A_later_email_from_the_company_fills_in_an_unknown_company_by_job_title()
+    {
+        // Pnet confirmation: no company. Then Cartrack rejects that job title.
+        await ImportAsync(Email(Received(company: null, role: "IT Support Technician - Tier 1"), daysAgo: 5));
+
+        var summary = await ImportAsync(Email(Says(EmailKind.Rejection, company: "Cartrack", role: "it support technician - tier 1")));
+
+        Assert.Equal(1, summary.Updated);
+        var app = Applications().Single();
+        Assert.Equal(("Cartrack", ApplicationStatus.Rejected), (app.Company, app.Status));
+        Assert.Null(app.Notes); // the "didn't say the company" note is gone
+    }
+
+    [Fact]
+    public async Task Two_unnamed_applications_with_the_same_title_are_not_guessed_between()
+    {
+        await ImportAsync(Email(Received(company: null, role: "Developer"), daysAgo: 100));
+        await ImportAsync(Email(Received(company: null, role: "Developer"), daysAgo: 1));
+
+        var summary = await ImportAsync(Email(Says(EmailKind.Rejection, company: "Acme", role: "Developer")));
+
+        Assert.Equal(1, summary.NeedsReview);
+        Assert.All(Applications(), a => Assert.Equal(EmailImporter.UnknownCompany, a.Company));
+    }
+
+    [Fact]
+    public async Task A_repeat_confirmation_with_no_company_is_not_a_second_application()
+    {
+        await ImportAsync(Email(Received(company: null, role: "Developer"), daysAgo: 2));
+        var summary = await ImportAsync(Email(Received(company: null, role: "Developer")));
+        Assert.Equal(1, summary.NoChange);
     }
 
     // ---- Status changes -------------------------------------------------
@@ -337,12 +383,12 @@ public sealed class EmailImporterTests : IDisposable
     [Fact]
     public async Task A_review_item_that_the_parser_now_understands_is_resolved_on_recheck()
     {
-        var email = Email(Received(company: null), messageId: "m1");
+        var email = Email(Received(company: null, role: null), messageId: "m1");
         await ImportAsync(email);
         Assert.Equal(ImportOutcome.NeedsReview, Imported("m1").Outcome);
 
-        // The parser improved: it now finds the company.
-        _parser.Results["m1"] = Received(company: "Entelect");
+        // The parser improved: it now finds the company and role.
+        _parser.Results["m1"] = Received(company: "Entelect", role: "Developer");
         var summary = await RecheckAsync(["m1"], email);
 
         Assert.Equal(1, summary.Created);

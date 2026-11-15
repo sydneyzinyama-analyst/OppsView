@@ -20,6 +20,9 @@ public static partial class EmailClassifier
 {
     public static EmailKind Classify(string subject, IReadOnlyList<string> sentences, bool fromJobBoard = false)
     {
+        // Visas, loans, accounts...: "application", but not for a job.
+        if (NotAJob().IsMatch(subject)) return EmailKind.NotRelevant;
+
         var factual = sentences.Where(s => !IsHypothetical(s)).Prepend(subject).ToList();
         bool Any(Regex pattern) => factual.Any(pattern.IsMatch);
 
@@ -39,9 +42,10 @@ public static partial class EmailClassifier
         // Softer wording ("thank you for your interest"), trusted only from employers.
         if (Any(WeakReceived())) return EmailKind.ApplicationReceived;
 
-        // Nothing about an application at all: not for us.
-        if (!sentences.Prepend(subject).Any(JobWords().IsMatch)) return EmailKind.NotRelevant;
-        return EmailKind.Unknown;
+        // Only ask the user about emails that are clearly about one of *their*
+        // applications. Generic job words ("role", "career") also appear in
+        // course adverts and newsletters, which aren't worth a review.
+        return factual.Any(ApplicationSignal().IsMatch) ? EmailKind.Unknown : EmailKind.NotRelevant;
     }
 
     /// <summary>"If…", "Should…", "In the event…": describes a possibility, not what happened.</summary>
@@ -55,7 +59,8 @@ public static partial class EmailClassifier
         @"|\b(won't|will not|wouldn't|would not|are not|aren't|not) (be )?(moving|move|going|taking (it|this|your application)) (ahead|forward|further)\b" +
         @"|\b(won't|will not|unable to|not able to|cannot|can't) (be )?(proceed(ing)?|progress(ing)?) (with )?your (application|candidacy)\b" +
         @"|\bregret to (inform|advise|let you know)\b|\bdecided (to|not to) (proceed|move forward|pursue|continue) with other\b" +
-        @"|\b(other|another) candidates? (whose|who|that)\b|\bposition has (now )?been filled\b|\bno longer (being )?consider",
+        @"|\b(other|another) candidates? (whose|who|that)\b|\bposition has (now )?been filled\b|\bno longer (being )?consider" +
+        @"|\bapplication\b.{0,120}\bunsuccessful\b",
         RegexOptions.IgnoreCase)]
     private static partial Regex Rejection();
 
@@ -87,11 +92,17 @@ public static partial class EmailClassifier
         @"\brecommend(ed|ation|ations)?\b|\bjob alerts?\b|\bjobs? (matching|for you|you (might|may)|near you|like this)\b" +
         @"|\bsimilar (jobs|roles|positions|vacancies)\b|\bapply now\b|\bnew jobs?\b|\b(new|latest|top) (vacancies|opportunities|positions)\b" +
         @"|\bbased on your (profile|search|cv|preferences|activity)\b|\b(you|candidates) (might|may) (also )?(like|be interested|be a (good|great) fit)\b" +
-        @"|\bare you (still )?(interested|looking|open)\b|\bdon't miss\b|\b(still|now|actively) hiring\b" +
+        @"|\bare you (still )?(interested|looking|open)\b|\bdon't miss\b|\b(still|now|actively) hiring\b|\btalent (community|pool|network)\b" +
         @"|\b(people|others|candidates) (also )?(applied|viewed)\b|\b(daily|weekly) (jobs|digest|alert)\b|\bcomplete your profile\b|\bupdate your (cv|profile)\b",
         RegexOptions.IgnoreCase)]
     private static partial Regex Recommendation();
 
-    [GeneratedRegex(@"\b(application|applied|apply|applying|interview|vacancy|position|role|candidate|recruit)", RegexOptions.IgnoreCase)]
-    private static partial Regex JobWords();
+    [GeneratedRegex(
+        @"\byour (job )?application\b|\byou applied\b|\bapplication (for|to)\b|\bcandidacy\b|\binterview\b|\bassessment\b" +
+        @"|\bshortlist|\bnext (step|round|stage)s?\b|\bone step closer\b",
+        RegexOptions.IgnoreCase)]
+    private static partial Regex ApplicationSignal();
+
+    [GeneratedRegex(@"\b(visa|work permit|permit application|passport|loan|credit card|insurance|bank account|account application|tender)\b", RegexOptions.IgnoreCase)]
+    private static partial Regex NotAJob();
 }

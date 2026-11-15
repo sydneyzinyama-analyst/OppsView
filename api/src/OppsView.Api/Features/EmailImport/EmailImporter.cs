@@ -103,25 +103,42 @@ public sealed class EmailImporter(AppDbContext db, IEmailParser parser, TimeProv
         }
     }
 
+    /// <summary>
+    /// Stand-ins when a confirmation leaves something out (Pnet's never name
+    /// the company; some employers never name the role). The application is
+    /// still created, so it's tracked, and a later email or the user fills
+    /// in the gap.
+    /// </summary>
+    public const string UnknownCompany = "Unknown company";
+    public const string UnknownRole = "Unknown role";
+
+    public static bool IsPlaceholder(string value) => value is UnknownCompany or UnknownRole;
+
     private (ImportOutcome, JobApplication?, string?) ApplyNewApplication(
         Guid userId, IncomingEmail email, ParsedEmail parsed, List<JobApplication> applications, DateTime now)
     {
-        if (parsed.Company is null) return Review("Couldn't find the company name in this email.");
-        if (parsed.Role is null) return Review($"Couldn't find the job title in this email from {parsed.Company}.");
+        if (parsed.Company is null && parsed.Role is null)
+            return Review("Couldn't find the company or the job title in this email.");
 
+        var company = parsed.Company ?? UnknownCompany;
+        var role = parsed.Role ?? UnknownRole;
         var appliedOn = DateOnly.FromDateTime(email.ReceivedAt);
+
         var existing = applications.FirstOrDefault(a =>
-            CompanyName.AreSame(a.Company, parsed.Company)
-            && SameRole(a.Role, parsed.Role)
+            (CompanyName.AreSame(a.Company, company) || a.Company == UnknownCompany && parsed.Company is null)
+            && (SameRole(a.Role, role) || a.Role == UnknownRole && parsed.Role is null)
             && Math.Abs(a.AppliedOn.DayNumber - appliedOn.DayNumber) <= SameApplicationWindow.TotalDays);
         if (existing is not null)
             return (ImportOutcome.NoChange, existing, "This application is already in OppsView.");
 
+        var missing = parsed.Company is null ? "company" : parsed.Role is null ? "job title" : null;
+        var notes = missing is null ? null : $"The email didn't say the {missing}. Click Edit to fill it in.";
+
         try
         {
             var application = JobApplication.Create(
-                userId, parsed.Company, parsed.Role, parsed.Platform ?? JobPlatform.Other, appliedOn,
-                jobUrl: null, notes: null, now, ApplicationSource.Email);
+                userId, company, role, parsed.Platform ?? JobPlatform.Other, appliedOn,
+                jobUrl: null, notes, now, ApplicationSource.Email);
             db.Applications.Add(application);
             applications.Add(application);
             return (ImportOutcome.Created, application, null);
@@ -164,6 +181,23 @@ public sealed class EmailImporter(AppDbContext db, IEmailParser parser, TimeProv
         {
             var open = candidates.Where(a => a.Status == target || StatusTransitions.IsAllowed(a.Status, target)).ToList();
             if (open.Count > 0) candidates = open;
+        }
+
+        if (candidates.Count == 0 && parsed.Role is not null)
+        {
+            // E.g. a Pnet confirmation created "Unknown company - IT Support
+            // Technician"; now Cartrack writes about that job title. If exactly
+            // one such application exists, it's this one: fill in the company.
+            var unnamed = applications
+                .Where(a => a.Company == UnknownCompany && SameRole(a.Role, parsed.Role))
+                .ToList();
+            if (unnamed.Count == 1)
+            {
+                var a = unnamed[0];
+                a.UpdateDetails(parsed.Company, a.Role, a.Platform, a.AppliedOn, a.JobUrl,
+                    a.Notes?.StartsWith("The email didn't say") == true ? null : a.Notes, email.ReceivedAt);
+                candidates = unnamed;
+            }
         }
 
         if (candidates.Count == 0)

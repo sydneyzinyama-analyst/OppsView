@@ -14,5 +14,9 @@ public static class GmailQuery
 
     public static string Build(DateTime sinceUtc) =>
         // after: takes seconds since 1970. -from:me skips emails you sent.
-        $"after:{new DateTimeOffset(DateTime.SpecifyKind(sinceUtc, DateTimeKind.Utc)).ToUnixTimeSeconds()} -from:me -in:chats {JobWords}";
+        // Social and Forums (LinkedIn group posts and the like) never hold
+        // application emails. Promotions stays in: some job sites'
+        // confirmations land there, and the parser ignores the adverts.
+        $"after:{new DateTimeOffset(DateTime.SpecifyKind(sinceUtc, DateTimeKind.Utc)).ToUnixTimeSeconds()} " +
+        $"-from:me -in:chats -category:social -category:forums {JobWords}";
 }
