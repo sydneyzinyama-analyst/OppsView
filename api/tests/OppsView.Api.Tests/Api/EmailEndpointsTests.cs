@@ -114,7 +114,7 @@ public class EmailEndpointsTests(OppsViewApiFactory factory) : ApiTestBase(facto
         await ConnectAsync(client);
         var id = Guid.NewGuid().ToString("N");
         AddToMailbox($"{id}-1", "Application received", "Thank you for applying for the Tester role at Yoco.");
-        AddToMailbox($"{id}-2", "Update", "Please update your candidate profile with your latest CV.");
+        AddToMailbox($"{id}-2", "Update", "Please log in to see the next steps for your application.");
 
         var first = await client.PostAsync("/email/sync", null);
         var summary = await first.Content.ReadFromJsonAsync<ImportSummary>(Json);
@@ -187,7 +187,7 @@ public class EmailEndpointsTests(OppsViewApiFactory factory) : ApiTestBase(facto
         // A rejection from a company with no application yet, and an unclear email.
         AddToMailbox($"{id}-r", "Your application",
             "Thank you for your interest in working for Cartrack by applying to the Support Technician position. Your application has been unsuccessful.");
-        AddToMailbox($"{id}-u", "Profile", "Please update your candidate profile.");
+        AddToMailbox($"{id}-u", "Profile", "Please log in to see the next steps for your application.");
         await client.PostAsync("/email/sync", null);
 
         var items = await client.GetFromJsonAsync<List<ReviewItemResponse>>("/email/review", Json);
@@ -218,7 +218,7 @@ public class EmailEndpointsTests(OppsViewApiFactory factory) : ApiTestBase(facto
         var owner = await SignedInClientAsync();
         await ConnectAsync(owner);
         var id = Guid.NewGuid().ToString("N");
-        AddToMailbox($"{id}-x", "Profile", "Please update your candidate profile.");
+        AddToMailbox($"{id}-x", "Profile", "Please log in to see the next steps for your application.");
         await owner.PostAsync("/email/sync", null);
         var item = (await owner.GetFromJsonAsync<List<ReviewItemResponse>>("/email/review", Json))!.First();
 

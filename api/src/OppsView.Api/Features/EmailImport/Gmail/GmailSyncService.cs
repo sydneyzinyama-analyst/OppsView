@@ -23,7 +23,7 @@ public sealed class GmailSyncService(
     private static readonly ConcurrentDictionary<Guid, SemaphoreSlim> SyncLocks = new();
 
     /// <summary>How many "needs review" emails to re-read per sync.</summary>
-    private const int MaxRecheckPerSync = 50;
+    private const int MaxRecheckPerSync = 200;
 
     private readonly GoogleOptions _options = options.Value;
     private readonly IDataProtector _tokens = dataProtection.CreateProtector("OppsView.Gmail.RefreshToken");

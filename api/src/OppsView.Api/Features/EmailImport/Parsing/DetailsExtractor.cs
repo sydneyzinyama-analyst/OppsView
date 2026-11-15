@@ -28,16 +28,23 @@ public static partial class DetailsExtractor
             }
         }
 
-        // 2. Role on its own ("Your application for X has been sent").
-        role ??= FirstMatch(sentences.Prepend(subject), RoleOnly(), "role", CleanRole);
+        // 2. Role on its own: subject lines like "Your Application to [2] X" or
+        //    "Job Application for X Unsuccessful", then sentences like "Your
+        //    application for X has been sent".
+        role ??= FirstMatch([subject], SubjectRole(), "role", CleanRole)
+            ?? FirstMatch(sentences.Prepend(subject), RoleOnly(), "role", CleanRole);
 
         // 3. Company on its own, most reliable first: a phrase naming it, the
         //    sender's display name ("Discovery Careers"), the sender's address
-        //    (careers@discovery.co.za), and last the sign-off.
+        //    (careers@discovery.co.za), the sign-off, and finally the name of
+        //    the job site or system that sent it.
         company ??= FirstMatch(sentences.Prepend(subject), CompanyOnly(), "company", CleanCompany)
-            ?? CleanCompany(senderName)
+            ?? (IsPersonName(senderName, senderAddress) ? null : CleanCompany(senderName))
             ?? SenderDomain.CompanyFrom(senderAddress)
-            ?? FromSignOff(sentences);
+            ?? FromSignOff(sentences)
+            // Nothing better: whoever sent it, even a job site ("Pnet").
+            // The importer swaps it for the real employer when one writes.
+            ?? SenderDomain.SenderOrganisation(senderAddress);
 
         return (company, role);
     }
@@ -63,6 +70,28 @@ public static partial class DetailsExtractor
         @"|\b(?:apply|applying|applied|application)\s+(?:for|to)\s+(?:the\s+)?(?:position\s+of\s+)?(?<role>.{2,100}?)\s+(?:position|role|vacancy|job|post|opportunity)\b",
         RegexOptions.IgnoreCase)]
     private static partial Regex RoleOnly();
+
+    // Whole subject lines: "Your Application to [2] Intermediate Java Developer",
+    // "Job Application for IT Support Technician - Tier 1 Unsuccessful",
+    // "Application for Data Analyst - Received". The trailing status word is dropped.
+    [GeneratedRegex(
+        @"^(?:(?:re|fw|fwd)\s*:\s*)*(?:job\s+)?(?:your\s+)?application\s+(?:for|to)\s+(?:the\s+)?(?:\[\w+\]\s*)?(?<role>.+?)" +
+        @"(?:\s*[-:|]?\s*\b(?:unsuccessful|successful|received|update|confirmation|confirmed|submitted|status|outcome|feedback|acknowledg\w*))?\s*$",
+        RegexOptions.IgnoreCase)]
+    private static partial Regex SubjectRole();
+
+    /// <summary>
+    /// "Roxanne Kellerman &lt;roxanne.kellerman@...&gt;" is a person (a recruiter),
+    /// not the company. Recognised by the name's words appearing in the address.
+    /// </summary>
+    internal static bool IsPersonName(string? name, string? address)
+    {
+        if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(address)) return false;
+        var words = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (words.Length is < 2 or > 4) return false;
+        var local = address.Split('@')[0].ToLowerInvariant();
+        return words.Any(w => w.Length >= 3 && local.Contains(w.ToLowerInvariant()));
+    }
 
     // "Thank you for choosing FutureSoft", "your interest in joining Acme"
     // The phrase is case-insensitive ((?i:...)); the name must start with a capital.
@@ -120,7 +149,7 @@ public static partial class DetailsExtractor
     private static partial Regex TrailingReferenceCode();
 
     // "BBD Global Talent Acquisition Team" -> "BBD"
-    [GeneratedRegex(@"\s*(\b(global|the)\s+)?\b(talent\s+acquisition|recruitment|recruiting|hiring|hr|human\s+resources|people|careers?|jobs?|admin)(\s+(team|department|dept))?\s*$|\s+team\s*$", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"\s*(\b(global|the)\s+)?\b(talent\s+acquisition|recruitment|recruiting|hiring|hr|human\s+resources|people\s*(&|and)\s*culture|people|careers?|jobs?|admin)(\s+(team|department|dept))?\s*$|\s+team\s*$", RegexOptions.IgnoreCase)]
     private static partial Regex TeamWords();
 
     // Things that turn up where a company name would be, but aren't one.

@@ -90,7 +90,7 @@ public class RuleBasedEmailParserTests
 
     [Fact]
     public void Job_related_emails_that_fit_no_rule_are_unknown() =>
-        Assert.Equal(EmailKind.Unknown, _parser.Parse(Email("Please update your candidate profile with your latest CV.")).Kind);
+        Assert.Equal(EmailKind.Unknown, _parser.Parse(Email("Please log in to see the next steps for your application.")).Kind);
 
     // ---- Details ---------------------------------------------------------
 
@@ -196,4 +196,81 @@ public class RuleBasedEmailParserTests
     public void Softer_wording_from_a_job_site_is_not() =>
         Assert.Equal(EmailKind.NotRelevant,
             _parser.Parse(Email("Thank you for your interest in Pnet Premium.", from: "noreply@pnet.co.za")).Kind);
+
+    // ---- From a real inbox (sender + subject as received) ------------------
+
+    [Fact]
+    public void A_recruiters_name_is_not_the_company()
+    {
+        var parsed = _parser.Parse(Email("Thank you for your application.",
+            subject: "Your Application to [2] Intermediate Java (Springboot) + Angular Fullstack Developer",
+            from: "Roxanne Kellerman <roxanne.kellerman@mail.manatal.com>"));
+
+        // Roxanne is a person, not the company; the email came through the
+        // Manatal hiring system, which is the best name available.
+        Assert.Equal("Manatal", parsed.Company);
+        Assert.Equal("Intermediate Java (Springboot) + Angular Fullstack Developer", parsed.Role);
+    }
+
+    [Fact]
+    public void A_person_at_a_company_gives_the_companys_name()
+    {
+        var parsed = _parser.Parse(Email("Unfortunately we will not be moving forward with your application.",
+            subject: "Monocle Tech Feedback", from: "Preleka Ramlutchman <Preleka.Ramlutchman@monocle.co.za>"));
+
+        Assert.Equal((EmailKind.Rejection, "Monocle"), (parsed.Kind, parsed.Company));
+    }
+
+    [Fact]
+    public void People_and_culture_teams_are_reduced_to_the_company() =>
+        Assert.Equal("Monocle",
+            _parser.Parse(Email("Thank you for applying.", from: "Monocle People & Culture <careers@example.org>")).Company);
+
+    [Fact]
+    public void A_rejection_forwarded_by_Pnet_is_read_from_the_subject()
+    {
+        var parsed = _parser.Parse(Email("",
+            subject: "Job Application for IT Support Technician - Tier 1 Unsuccessful", from: "Cartrack <cartrack@pnet.co.za>"));
+
+        Assert.Equal((EmailKind.Rejection, "Cartrack", "IT Support Technician - Tier 1"), (parsed.Kind, parsed.Company, parsed.Role));
+    }
+
+    [Fact]
+    public void A_Pnet_confirmation_gives_the_role_from_the_subject()
+    {
+        var parsed = _parser.Parse(Email("",
+            subject: "Sydney, your application for Industrial Software Developer has been sent", from: "Pnet <info@info.pnet.co.za>"));
+
+        // Pnet never names the employer, so the company is the sender: Pnet.
+        Assert.Equal((EmailKind.ApplicationReceived, "Pnet", "Industrial Software Developer", JobPlatform.Pnet),
+            (parsed.Kind, parsed.Company, parsed.Role, parsed.Platform));
+    }
+
+    [Theory]
+    [InlineData("Our recommendation: Full Stack Developer", "Emma Jacobs from Pnet <info@jobalerts.pnet.co.za>")]
+    [InlineData("🚀 Grow your career with 40% off | Coursera Plus", "Coursera <Coursera@m.learn.coursera.org>")]
+    [InlineData("In return for your support", "Temu <temu@commerce.temuemail.com>")]
+    [InlineData("Welcome to the Sanlam Talent Community", "Sanlam Group Careers <noreply@sanlam.co.za>")]
+    [InlineData("Don't miss conversations in Software Developer, Programmer and Architect", "LinkedIn <groups-noreply@linkedin.com>")]
+    [InlineData("RE: Application for a critical skills work visa", "Eldorette Isaacson <eldorette@novaimmigration.co.za>")]
+    [InlineData("Re: Employment Assistance Enquiry", "Kamil Stypulkowski <kamilstypulkowski@blackpen.co.za>")]
+    public void Promotions_newsletters_and_non_job_applications_are_ignored(string subject, string from) =>
+        Assert.Equal(EmailKind.NotRelevant, _parser.Parse(Email("", subject, from)).Kind);
+
+    [Fact]
+    public void An_unclear_email_about_your_application_still_goes_to_review() =>
+        Assert.Equal(EmailKind.Unknown, _parser.Parse(Email("",
+            subject: "Important information about your application to Nintex", from: "careers@nintex.com")).Kind);
+
+    [Theory]
+    [InlineData("Pnet <info@info.pnet.co.za>", "Pnet")]
+    [InlineData("jobs-noreply@linkedin.com", "LinkedIn")]
+    [InlineData("noreply@successfactors.eu", "SuccessFactors")]
+    [InlineData("noreply@kardee.com", "Kardee")]
+    public void Without_anything_better_the_company_is_whoever_sent_the_email(string from, string expected) =>
+        Assert.Equal(expected, _parser.Parse(Email("", "Your application for Data Analyst has been sent", from)).Company);
+
+    [Fact]
+    public void Personal_mail_addresses_never_become_the_company() =>
+        Assert.Null(_parser.Parse(Email("", "Your application for Data Analyst has been sent", "someone@gmail.com")).Company);
 }
