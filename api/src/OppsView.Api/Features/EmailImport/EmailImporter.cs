@@ -1,0 +1,186 @@
+using Microsoft.EntityFrameworkCore;
+using OppsView.Api.Data;
+using OppsView.Api.Domain;
+
+namespace OppsView.Api.Features.EmailImport;
+
+/// <summary>
+/// Turns parsed emails into changes to the user's applications.
+///
+/// Guiding rule: when in doubt, don't guess. Anything ambiguous (no company
+/// found, no matching application, two possible matches, a status that
+/// contradicts what the user already recorded) goes to the "Needs review"
+/// list instead of silently changing data.
+///
+/// Every change goes through the same domain methods the API uses
+/// (JobApplication.Create / ChangeStatus), so imported data obeys the same
+/// rules and status changes appear in the history like any other.
+/// </summary>
+public sealed class EmailImporter(AppDbContext db, IEmailParser parser, TimeProvider time)
+{
+    /// <summary>
+    /// A second "thanks for applying" for the same company and role within this
+    /// window is the same application (duplicate emails, or one from the job
+    /// site and one from the employer). After it, it's a fresh application.
+    /// </summary>
+    public static readonly TimeSpan SameApplicationWindow = TimeSpan.FromDays(60);
+
+    public async Task<ImportSummary> ImportAsync(Guid userId, IReadOnlyCollection<IncomingEmail> emails, CancellationToken ct)
+    {
+        if (emails.Count == 0) return ImportSummary.Empty;
+
+        var ids = emails.Select(e => e.MessageId).ToList();
+        var alreadyProcessed = (await db.ImportedEmails
+                .Where(e => e.UserId == userId && ids.Contains(e.MessageId))
+                .Select(e => e.MessageId)
+                .ToListAsync(ct))
+            .ToHashSet();
+
+        // A personal tracker holds hundreds of applications at most, so
+        // loading them once and matching in memory is simpler and faster than
+        // a query per email. Tracked, so status changes are saved below.
+        var applications = await db.Applications.Where(a => a.UserId == userId).ToListAsync(ct);
+
+        var now = time.GetUtcNow().UtcDateTime;
+        var counts = new Dictionary<ImportOutcome, int>();
+        var seen = new HashSet<string>();
+
+        // Oldest first, so "thanks for applying" is handled before the
+        // rejection that follows it, even when both arrive in one sync.
+        foreach (var email in emails.OrderBy(e => e.ReceivedAt))
+        {
+            if (alreadyProcessed.Contains(email.MessageId) || !seen.Add(email.MessageId)) continue;
+
+            var parsed = Clean(parser.Parse(email));
+            var (outcome, application, reason) = Apply(userId, email, parsed, applications, now);
+
+            db.ImportedEmails.Add(ImportedEmail.Record(userId, email, parsed, outcome, application?.Id, reason, now));
+            counts[outcome] = counts.GetValueOrDefault(outcome) + 1;
+        }
+
+        // One SaveChanges = one transaction: a sync is applied completely or
+        // not at all.
+        await db.SaveChangesAsync(ct);
+
+        return new ImportSummary(
+            counts.GetValueOrDefault(ImportOutcome.Created),
+            counts.GetValueOrDefault(ImportOutcome.Updated),
+            counts.GetValueOrDefault(ImportOutcome.NoChange),
+            counts.GetValueOrDefault(ImportOutcome.Ignored),
+            counts.GetValueOrDefault(ImportOutcome.NeedsReview),
+            emails.Count - seen.Count);
+    }
+
+    private (ImportOutcome, JobApplication?, string?) Apply(
+        Guid userId, IncomingEmail email, ParsedEmail parsed, List<JobApplication> applications, DateTime now)
+    {
+        switch (parsed.Kind)
+        {
+            case EmailKind.NotRelevant:
+                return (ImportOutcome.Ignored, null, null);
+            case EmailKind.Unknown:
+                return Review("OppsView couldn't tell what this email is about.");
+            case EmailKind.ApplicationReceived:
+                return ApplyNewApplication(userId, email, parsed, applications, now);
+            default:
+                return ApplyStatusChange(email, parsed, applications);
+        }
+    }
+
+    private (ImportOutcome, JobApplication?, string?) ApplyNewApplication(
+        Guid userId, IncomingEmail email, ParsedEmail parsed, List<JobApplication> applications, DateTime now)
+    {
+        if (parsed.Company is null) return Review("Couldn't find the company name in this email.");
+        if (parsed.Role is null) return Review($"Couldn't find the job title in this email from {parsed.Company}.");
+
+        var appliedOn = DateOnly.FromDateTime(email.ReceivedAt);
+        var existing = applications.FirstOrDefault(a =>
+            CompanyName.AreSame(a.Company, parsed.Company)
+            && SameRole(a.Role, parsed.Role)
+            && Math.Abs(a.AppliedOn.DayNumber - appliedOn.DayNumber) <= SameApplicationWindow.TotalDays);
+        if (existing is not null)
+            return (ImportOutcome.NoChange, existing, "This application is already in OppsView.");
+
+        try
+        {
+            var application = JobApplication.Create(
+                userId, parsed.Company, parsed.Role, parsed.Platform ?? JobPlatform.Other, appliedOn,
+                jobUrl: null, notes: null, now, ApplicationSource.Email);
+            db.Applications.Add(application);
+            applications.Add(application);
+            return (ImportOutcome.Created, application, null);
+        }
+        catch (DomainException ex)
+        {
+            return Review(ex.Message);
+        }
+    }
+
+    private static (ImportOutcome, JobApplication?, string?) ApplyStatusChange(
+        IncomingEmail email, ParsedEmail parsed, List<JobApplication> applications)
+    {
+        var target = parsed.Kind switch
+        {
+            EmailKind.ApplicationViewed => ApplicationStatus.Viewed,
+            EmailKind.InterviewInvite => ApplicationStatus.Interview,
+            EmailKind.Offer => ApplicationStatus.Offer,
+            EmailKind.Rejection => ApplicationStatus.Rejected,
+            _ => throw new ArgumentOutOfRangeException(nameof(parsed), parsed.Kind, null),
+        };
+        var label = target.ToString().ToLowerInvariant();
+
+        if (parsed.Company is null) return Review($"Looks like a {label} email, but the company name wasn't found.");
+
+        var candidates = applications.Where(a => CompanyName.AreSame(a.Company, parsed.Company)).ToList();
+        if (parsed.Role is not null && candidates.Count > 1)
+        {
+            var sameRole = candidates.Where(a => SameRole(a.Role, parsed.Role)).ToList();
+            if (sameRole.Count > 0) candidates = sameRole;
+        }
+        // If several remain, prefer the ones the email can still move forward.
+        if (candidates.Count > 1)
+        {
+            var open = candidates.Where(a => a.Status == target || StatusTransitions.IsAllowed(a.Status, target)).ToList();
+            if (open.Count > 0) candidates = open;
+        }
+
+        if (candidates.Count == 0)
+            return Review($"Looks like a {label} email from {parsed.Company}, but there's no application to them in OppsView.");
+        if (candidates.Count > 1)
+            return Review($"You have {candidates.Count} applications to {parsed.Company}; OppsView couldn't tell which one this email is about.");
+
+        var application = candidates[0];
+        if (application.Status == target)
+            return (ImportOutcome.NoChange, application, $"Already marked as {target}.");
+
+        if (StatusTransitions.IsAllowed(application.Status, target))
+        {
+            // Dated when the email arrived, not when we synced: the history
+            // should show when things actually happened.
+            application.ChangeStatus(target, email.ReceivedAt, ApplicationSource.Email);
+            return (ImportOutcome.Updated, application, null);
+        }
+
+        // Final states (Offer, Rejected) contradicting the email need a human.
+        if (application.Status is ApplicationStatus.Offer or ApplicationStatus.Rejected)
+            return Review($"This {label} email doesn't match the application's current status ({application.Status}).", application);
+
+        // Otherwise the email is behind the application (e.g. "viewed" after
+        // an interview was already recorded): nothing new to learn.
+        return (ImportOutcome.NoChange, application, $"Application is already past {target}.");
+    }
+
+    private static (ImportOutcome, JobApplication?, string?) Review(string reason, JobApplication? application = null) =>
+        (ImportOutcome.NeedsReview, application, reason);
+
+    private static bool SameRole(string a, string b) =>
+        string.Equals(Collapse(a), Collapse(b), StringComparison.OrdinalIgnoreCase);
+
+    private static string Collapse(string s) => string.Join(' ', s.Split(' ', StringSplitOptions.RemoveEmptyEntries));
+
+    private static ParsedEmail Clean(ParsedEmail p) => p with
+    {
+        Company = string.IsNullOrWhiteSpace(p.Company) ? null : p.Company.Trim(),
+        Role = string.IsNullOrWhiteSpace(p.Role) ? null : p.Role.Trim(),
+    };
+}
