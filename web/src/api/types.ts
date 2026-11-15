@@ -89,6 +89,8 @@ export interface ImportSummary {
   ignored: number
   needsReview: number
   alreadyProcessed: number
+  /** Emails Gmail wouldn't hand over this time; the next sync tries them again. */
+  failed: number
 }
 
 /** An email OppsView wasn't sure about. */

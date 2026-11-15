@@ -119,25 +119,60 @@ public sealed class GmailSyncService(
         // Overlap the previous sync by two days, in case an email arrived
         // while that sync was running. Already-processed emails are skipped.
         var since = connection.LastSyncedAt?.AddDays(-2) ?? now.AddDays(-_options.InitialSyncDays);
-        var ids = await gmail.SearchMessageIdsAsync(accessToken, GmailQuery.Build(since), _options.MaxMessagesPerSync, ct);
 
-        var known = (await db.ImportedEmails
-                .Where(e => e.UserId == userId && ids.Contains(e.MessageId))
-                .Select(e => e.MessageId)
-                .ToListAsync(ct))
-            .ToHashSet();
-        var newIds = ids.Where(id => !known.Contains(id)).ToList();
+        IReadOnlyList<string> ids;
+        var emails = new List<IncomingEmail>();
+        var known = new HashSet<string>();
+        var failed = 0;
+        try
+        {
+            ids = await gmail.SearchMessageIdsAsync(accessToken, GmailQuery.Build(since), _options.MaxMessagesPerSync, ct);
 
-        var emails = new List<IncomingEmail>(newIds.Count);
-        foreach (var id in newIds)
-            emails.Add(await gmail.GetMessageAsync(accessToken, id, ct));
+            known = (await db.ImportedEmails
+                    .Where(e => e.UserId == userId && ids.Contains(e.MessageId))
+                    .Select(e => e.MessageId)
+                    .ToListAsync(ct))
+                .ToHashSet();
+            var newIds = ids.Where(id => !known.Contains(id)).ToList();
+
+            for (var i = 0; i < newIds.Count; i++)
+            {
+                try
+                {
+                    emails.Add(await gmail.GetMessageAsync(accessToken, newIds[i], ct));
+                }
+                catch (GmailApiException ex) when (ex.IsRateLimit)
+                {
+                    // Still rate-limited after retrying: stop here, import
+                    // what we have, and let the next sync pick up the rest.
+                    logger.LogWarning(ex, "Gmail rate limit reached; {Remaining} emails left for the next sync", newIds.Count - i);
+                    failed += newIds.Count - i;
+                    break;
+                }
+                catch (GmailApiException ex)
+                {
+                    // One unreadable email mustn't stop the sync. It isn't
+                    // recorded as processed, so the next sync tries it again.
+                    logger.LogWarning(ex, "Skipping Gmail message {MessageId}", newIds[i]);
+                    failed++;
+                }
+            }
+        }
+        catch (GmailAccessRevokedException)
+        {
+            connection.MarkNeedsReconnect();
+            await db.SaveChangesAsync(ct);
+            throw new GmailNotConnectedException();
+        }
 
         var summary = await importer.ImportAsync(userId, emails, ct);
 
-        connection.MarkSynced(now);
+        // Only move the "synced up to" point forward if every email was read,
+        // otherwise the next sync's search window could skip the failed ones.
+        if (failed == 0) connection.MarkSynced(now);
         await db.SaveChangesAsync(ct);
 
-        return summary with { AlreadyProcessed = summary.AlreadyProcessed + known.Count };
+        return summary with { AlreadyProcessed = summary.AlreadyProcessed + known.Count, Failed = failed };
     }
 
     public async Task DisconnectAsync(Guid userId, CancellationToken ct)

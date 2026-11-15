@@ -73,6 +73,17 @@ public sealed class EmailController(
         {
             return Problem(statusCode: StatusCodes.Status409Conflict, title: "A sync is already running.");
         }
+        catch (GmailApiException ex)
+        {
+            // Gmail itself had a problem (e.g. still rate-limited after
+            // retries). Say so plainly instead of a generic 500.
+            return Problem(
+                statusCode: StatusCodes.Status502BadGateway,
+                title: ex.IsRateLimit
+                    ? "Gmail is asking OppsView to slow down. Please try again in a minute."
+                    : "Gmail returned an error. Please try again in a minute.",
+                detail: ex.Message);
+        }
     }
 
     [HttpGet("review")]

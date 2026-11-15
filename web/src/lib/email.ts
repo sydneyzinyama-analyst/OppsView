@@ -7,6 +7,8 @@ export function describeSync(s: ImportSummary): string {
   if (s.updated) parts.push(`updated ${s.updated}`)
   let text = parts.length ? capitalize(parts.join(', ')) + '.' : 'No new application emails.'
   if (s.needsReview) text += ` ${s.needsReview} email${s.needsReview === 1 ? ' needs' : 's need'} your review.`
+  if (s.failed)
+    text += ` ${s.failed} email${s.failed === 1 ? '' : 's'} couldn't be read from Gmail right now and will be tried again next sync.`
   return text
 }
 
