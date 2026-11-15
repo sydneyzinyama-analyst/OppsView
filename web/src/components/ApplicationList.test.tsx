@@ -62,7 +62,7 @@ describe('ApplicationList', () => {
 
   it('loads and shows the status history', async () => {
     vi.spyOn(api, 'getHistory').mockResolvedValue([
-      { fromStatus: 'Applied', toStatus: 'Interview', changedAt: '2026-11-10T09:00:00Z' },
+      { fromStatus: 'Applied', toStatus: 'Interview', changedAt: '2026-11-10T09:00:00Z', source: 'Manual' },
     ])
     renderList()
 

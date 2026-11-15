@@ -16,6 +16,9 @@ export const PLATFORM_LABELS: Record<JobPlatform, string> = {
   Other: 'Other',
 }
 
+/** Whether something was typed in by the user or imported from an email. */
+export type ApplicationSource = 'Manual' | 'Email'
+
 export interface Application {
   id: string
   company: string
@@ -26,6 +29,7 @@ export interface Application {
   appliedOn: string
   jobUrl: string | null
   notes: string | null
+  source: ApplicationSource
   /** ISO 8601 UTC timestamps. */
   createdAt: string
   updatedAt: string
@@ -47,6 +51,7 @@ export interface StatusChange {
   fromStatus: ApplicationStatus
   toStatus: ApplicationStatus
   changedAt: string
+  source: ApplicationSource
 }
 
 export interface AuthResponse {

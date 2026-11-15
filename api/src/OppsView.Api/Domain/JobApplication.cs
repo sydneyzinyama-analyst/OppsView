@@ -27,6 +27,10 @@ public class JobApplication
     public DateOnly AppliedOn { get; private set; }
     public string? JobUrl { get; private set; }
     public string? Notes { get; private set; }
+
+    /// <summary>Whether the user added this application or it was imported from an email.</summary>
+    public ApplicationSource Source { get; private set; }
+
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
 
@@ -43,7 +47,8 @@ public class JobApplication
         DateOnly appliedOn,
         string? jobUrl,
         string? notes,
-        DateTime nowUtc)
+        DateTime nowUtc,
+        ApplicationSource source = ApplicationSource.Manual)
     {
         if (userId == Guid.Empty)
             throw new ArgumentException("A user is required.", nameof(userId));
@@ -53,6 +58,7 @@ public class JobApplication
             Id = Guid.NewGuid(),
             UserId = userId,
             Status = ApplicationStatus.Applied,
+            Source = source,
             CreatedAt = nowUtc,
         };
         application.ApplyDetails(company, role, platform, appliedOn, jobUrl, notes, nowUtc);
@@ -75,7 +81,10 @@ public class JobApplication
         ApplyDetails(company, role, platform, appliedOn, jobUrl, notes, nowUtc);
     }
 
-    public StatusChange ChangeStatus(ApplicationStatus newStatus, DateTime nowUtc)
+    public StatusChange ChangeStatus(
+        ApplicationStatus newStatus,
+        DateTime nowUtc,
+        ApplicationSource source = ApplicationSource.Manual)
     {
         if (!Enum.IsDefined(newStatus))
             throw new DomainException(nameof(Status), "Unknown status.");
@@ -84,7 +93,7 @@ public class JobApplication
         if (!StatusTransitions.IsAllowed(Status, newStatus))
             throw new DomainException(nameof(Status), $"Can't move an application from {Status} to {newStatus}.");
 
-        var change = new StatusChange(Id, Status, newStatus, nowUtc);
+        var change = new StatusChange(Id, Status, newStatus, nowUtc, source);
         _history.Add(change);
         Status = newStatus;
         UpdatedAt = nowUtc;

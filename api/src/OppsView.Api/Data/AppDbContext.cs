@@ -8,6 +8,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<User> Users => Set<User>();
     public DbSet<JobApplication> Applications => Set<JobApplication>();
     public DbSet<StatusChange> StatusHistory => Set<StatusChange>();
+    public DbSet<ImportedEmail> ImportedEmails => Set<ImportedEmail>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

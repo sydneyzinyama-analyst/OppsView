@@ -13,15 +13,24 @@ public class StatusChange
     public ApplicationStatus ToStatus { get; private set; }
     public DateTime ChangedAt { get; private set; }
 
+    /// <summary>Whether the user made this change or an email triggered it.</summary>
+    public ApplicationSource Source { get; private set; }
+
     // EF Core needs a parameterless constructor to materialise rows.
     private StatusChange() { }
 
-    internal StatusChange(Guid applicationId, ApplicationStatus from, ApplicationStatus to, DateTime changedAt)
+    internal StatusChange(
+        Guid applicationId,
+        ApplicationStatus from,
+        ApplicationStatus to,
+        DateTime changedAt,
+        ApplicationSource source)
     {
         Id = Guid.NewGuid();
         ApplicationId = applicationId;
         FromStatus = from;
         ToStatus = to;
         ChangedAt = changedAt;
+        Source = source;
     }
 }

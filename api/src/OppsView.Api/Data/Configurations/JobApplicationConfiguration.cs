@@ -21,6 +21,7 @@ public class JobApplicationConfiguration : IEntityTypeConfiguration<JobApplicati
         // or inserting enum members can't silently corrupt existing rows.
         builder.Property(a => a.Platform).HasConversion<string>().HasMaxLength(32);
         builder.Property(a => a.Status).HasConversion<string>().HasMaxLength(32);
+        builder.Property(a => a.Source).HasConversion<string>().HasMaxLength(16);
 
         builder.HasOne<User>()
             .WithMany()
