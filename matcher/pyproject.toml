@@ -5,7 +5,11 @@ description = "OppsView CV matcher: compares a CV with a job ad and lists matche
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115",
-    "uvicorn[standard]>=0.32",
+    # Plain uvicorn, not uvicorn[standard]: the "standard" extras (pyyaml,
+    # watchfiles, httptools) are optional speed-ups that don't always have
+    # ready-made Windows builds for the newest Python, and then need a C
+    # compiler to install. The matcher doesn't need them; --reload still works.
+    "uvicorn>=0.32",
     "python-multipart>=0.0.18",  # file uploads in FastAPI
     "pypdf>=5.1",                # reading PDF CVs
     "python-docx>=1.1",          # reading Word CVs
