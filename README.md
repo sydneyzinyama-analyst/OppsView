@@ -6,7 +6,7 @@ Job hunting means sending dozens of applications across Pnet, Indeed, LinkedIn, 
 
 Every application moves through the pipeline (Applied, Viewed, Interview, Offer, Rejected) with a full history of every status change. Later phases add a CV matcher that scores your CV against a job ad and lists the skills you're missing, follow-up reminders when a company goes quiet, and a dashboard that shows your response rate by platform and where your applications stall.
 
-![OppsView: matching a CV against a job ad](docs/screenshot-phase3.png)
+![OppsView: follow-up reminders under the bell](docs/screenshot-phase4.png)
 
 This repository is a portfolio project, built in phases. Each phase adds a service in a different stack.
 
@@ -16,7 +16,7 @@ This repository is a portfolio project, built in phases. Each phase adds a servi
 | 1 | [`web/`](web/README.md): the tracker UI | React 19, TypeScript, Vite | ✅ done |
 | 2 | Email import: read confirmation, rejection and interview emails from Pnet, Indeed, Workable, LinkedIn and company portals, and create or update applications automatically | Gmail API (OAuth, read-only), in the .NET API | ✅ done |
 | 3 | [`matcher/`](matcher/README.md): CV vs job ad match score and missing skills | Python, FastAPI | ✅ done |
-| 4 | [`notifier/`](notifier/README.md): follow-up reminders after N days | Java, Spring Boot, RabbitMQ | planned |
+| 4 | [`notifier/`](notifier/README.md): follow-up reminders after N days | Java, Spring Boot, RabbitMQ | ✅ done |
 | 5 | [`dashboard/`](dashboard/README.md): analytics, plus CI and Azure deployment | Angular, GitHub Actions, Azure | planned |
 
 ## Architecture
@@ -29,13 +29,17 @@ This repository is a portfolio project, built in phases. Each phase adds a servi
 │              │ ◀─────────── │       to the signed-in user)     │   │ StatusHistory    │
 └──────────────┘              │   → Domain (entities + rules)    │   │ ImportedEmails   │
                               │   → EF Core (AppDbContext)       │   │ GmailConnections │
-                              │                                  │   │ Cvs              │
-                              │ Email import:                    │   └──────────────────┘
-                              │   Gmail API → parser → importer ─┼──▶ Google (read-only)
-                              │ CV matching:                     │
-                              │   MatcherClient ─────────────────┼──▶ Python matcher (FastAPI)
-                              │  :5226                           │    :8000, internal only
-                              └──────────────────────────────────┘
+                              │                                  │   │ Cvs, Reminders   │
+                              │ Email import:                    │   │ OutboxMessages   │
+                              │   Gmail API → parser → importer ─┼──▶│ notifier.* ◀─┐   │
+                              │ CV matching:                     │   └──────────────┼───┘
+                              │   MatcherClient ─────────────────┼──▶ Python matcher (FastAPI) :8000
+                              │ Events:                          │                  │
+                              │   outbox → RabbitMQ publisher ───┼──┐               │
+                              │   reminder consumer ◀────────────┼┐ │               │
+                              │  :5226                           ││ ▼               │
+                              └──────────────────────────────────┘│ RabbitMQ ──▶ Java notifier
+                                                                  └── reminder.due ◀─(Spring Boot)
 ```
 
 Key design decisions:
@@ -47,6 +51,7 @@ Key design decisions:
 - **Email import acts on what it recognises.** A rule-based parser reads each job email (confirmation, viewed, interview, offer, rejection, job alert) and finds the company, role and platform, falling back to the sender's address (and, for job sites like Pnet that never name the employer, the job site's name until the employer writes). Recognised emails create or update applications through the same domain methods as the API; a status email for a job OppsView never saw creates it with that status. Only emails it can't classify, or that name neither a company nor a job title, go to **Needs review**. Plain rules rather than machine learning, so every decision can be explained and tested against real (anonymised) emails.
 - **Read-only, minimal storage.** OppsView asks Google only for `gmail.readonly`. It stores the sender, subject and the details it extracted, never email bodies. Google's refresh token is encrypted with ASP.NET Core Data Protection.
 - **The CV matcher is a separate, internal service.** It's written in Python (FastAPI) and called only by the .NET API (optionally with a shared key), never by the browser, so login checks and data access stay in one place. Matching uses a skills catalogue (`matcher/src/matcher/skills.toml`) with aliases and implied skills; required skills weigh double, and "X or Y" counts as one requirement met by either. Only the CV's text is stored, not the file.
+- **Event-driven reminders, with a transactional outbox.** Every application change is written as an event to an `OutboxMessages` table **in the same transaction** (an EF Core interceptor, so no code path can forget), then published to RabbitMQ in the background. An event can't be lost if RabbitMQ is down, and can't be sent for a change that was rolled back. The Java notifier keeps its own copy of the data in its own schema, plans reminders, and sends `reminder.due` back. Both sides handle duplicate and out-of-order delivery and use dead-letter queues. Neither service calls the other directly, so each keeps working while the other is down.
 - **Tests exercise the real pipeline.** API integration tests boot the real app with `WebApplicationFactory`, running on in-memory SQLite (a real relational database) with a fake clock.
 
 ## Running it locally
@@ -57,6 +62,7 @@ You need:
 - [Node.js 20+](https://nodejs.org/)
 - PostgreSQL 16 or 17. Option A installs it natively (no Docker needed). Option B uses Docker.
 - [Python 3.12+](https://www.python.org/downloads/) for the CV matcher (`scoop install python` on Windows)
+- [Java 25](https://adoptium.net/) for the reminders notifier (`scoop bucket add java`, then `scoop install temurin-lts-jdk`), plus a free [CloudAMQP](https://www.cloudamqp.com) RabbitMQ instance
 
 The commands below are for PowerShell on Windows. They work the same in a macOS/Linux shell, except for generating the signing key (see step 3).
 
@@ -190,13 +196,25 @@ uvicorn matcher.api:app --reload --port 8000
 
 In the web app, open **CV match**, upload your CV, paste a job ad and click **Match my CV**. To save the score on an application, pick it in the list, or click **Match CV** on its row.
 
-### Day-to-day: three windows
+### 8. Run the reminders notifier (optional)
 
-| Window | Folder | Command |
-|---|---|---|
-| API | `api` | `dotnet run --project src/OppsView.Api` |
-| Website | `web` | `npm run dev` |
-| Matcher | `matcher` | `.venv\Scripts\Activate.ps1`, then `uvicorn matcher.api:app --reload --port 8000` |
+Follow [`notifier/README.md`](notifier/README.md). In short:
+1. Create a free CloudAMQP instance and copy its AMQP URL.
+2. Put it in the API's user-secrets as `RabbitMq:Url`, and in `notifier/config/local.properties` (with your database password).
+3. From `notifier/`, run `.\mvnw.cmd spring-boot:run`.
+
+Reminders then appear under the 🔔. Without RabbitMQ everything else works, and the API's events simply wait in the outbox.
+
+### Day-to-day
+
+| Window | Folder | Command | Needed for |
+|---|---|---|---|
+| API | `api` | `dotnet run --project src/OppsView.Api` | everything |
+| Website | `web` | `npm run dev` | everything |
+| Matcher | `matcher` | `.venv\Scripts\Activate.ps1`, then `uvicorn matcher.api:app --port 8000` | CV match |
+| Notifier | `notifier` | `.\mvnw.cmd spring-boot:run` | reminders |
+
+The matcher and the notifier are optional: start them only when you need them. After `dotnet run` has started the API, `dotnet build-server shutdown` frees a few hundred MB of RAM.
 
 ## Repository layout
 
@@ -204,7 +222,7 @@ In the web app, open **CV match**, upload your CV, paste a job ad and click **Ma
 api/         ASP.NET Core API and its tests (see api/README.md)
 web/         React app (see web/README.md)
 matcher/     Python CV matcher (see matcher/README.md)
-notifier/    Phase 4 placeholder
+notifier/    Java reminders service (see notifier/README.md)
 dashboard/   Phase 5 placeholder
 docs/        screenshots and, later, the architecture diagram
 docker-compose.yml   optional PostgreSQL for Docker users and CI
