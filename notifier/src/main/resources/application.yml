@@ -1,0 +1,45 @@
+# OppsView notifier settings.
+#
+# Secrets (database password, RabbitMQ URL) are NOT in this file. Put them in
+# config/local.properties (git-ignored; copy config/local.properties.example)
+# or in environment variables.
+spring:
+  application:
+    name: oppsview-notifier
+  main:
+    web-application-type: none   # a background worker: no web server, less memory
+  config:
+    import: optional:file:./config/local.properties
+
+  datasource:
+    url: ${NOTIFIER_DB_URL:jdbc:postgresql://localhost:5432/oppsview?currentSchema=notifier}
+    username: ${NOTIFIER_DB_USER:oppsview}
+    password: ${NOTIFIER_DB_PASSWORD:}
+    hikari:
+      maximum-pool-size: 3       # a small worker doesn't need more connections
+  flyway:
+    schemas: notifier            # the notifier's own schema, created if missing
+    default-schema: notifier
+
+  rabbitmq:
+    # amqps://user:password@host/vhost (CloudAMQP shows this as the "AMQP URL")
+    addresses: ${RABBITMQ_URL:amqp://guest:guest@localhost:5672/}
+    publisher-confirm-type: correlated
+    listener:
+      simple:
+        acknowledge-mode: auto
+        default-requeue-rejected: false   # after the retries below, failures go to the dead-letter queue
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 1s
+
+notifier:
+  check-interval: PT1M          # how often due reminders are sent
+  reminders:
+    follow-up-days: 7
+    move-on-days: 21
+    after-interview-days: 5
+    offer-reply-days: 2
+    hour-utc: 8                 # 10:00 in South Africa
+    max-overdue-days: 7
