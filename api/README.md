@@ -91,6 +91,8 @@ The folders group code **by feature** (`Features/Applications`), not by technica
 | `Google:RedirectUri` | default `http://localhost:5226/email/google/callback` | Must match the Google Cloud console exactly |
 | `Google:WebAppUrl` | default `http://localhost:5173` | Where the browser goes after connecting |
 | `Google:InitialSyncDays`, `Google:MaxMessagesPerSync` | defaults 60 and 200 | |
+| `RabbitMq:Url` | user-secrets / env `RabbitMq__Url` | **Secret.** `amqps://user:pass@host/vhost`. Optional: without it, events wait in the outbox |
+| `Outbox:PollSeconds` | default 5 | How often waiting events are sent; 0 turns the sender off |
 | `Matcher:BaseUrl` | default `http://localhost:8000` | Where the Python matcher runs |
 | `Matcher:ApiKey` | user-secrets / env `Matcher__ApiKey` | Optional shared key; must equal the matcher's `MATCHER_API_KEY` |
 | `EmailImport:NoReplyCheckMinutes` | default 60 | How often the background job applies passed "no reply by X" deadlines; 0 turns it off |

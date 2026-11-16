@@ -232,4 +232,17 @@ public class JobApplicationTests
         application.SetNoReplyDeadline(Today.AddDays(30));
         Assert.Null(application.NoReplyDeadline);
     }
+
+    [Fact]
+    public void StatusChangedAt_starts_at_creation_and_moves_with_each_status_change()
+    {
+        var application = NewApplication();
+        Assert.Equal(Now, application.StatusChangedAt);
+
+        application.UpdateDetails("Acme", "Dev", JobPlatform.Pnet, Today, null, "notes", Now.AddDays(1));
+        Assert.Equal(Now, application.StatusChangedAt); // editing details isn't a status change
+
+        application.ChangeStatus(ApplicationStatus.Interview, Now.AddDays(2));
+        Assert.Equal(Now.AddDays(2), application.StatusChangedAt);
+    }
 }

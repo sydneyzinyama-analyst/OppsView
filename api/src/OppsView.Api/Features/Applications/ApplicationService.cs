@@ -66,10 +66,14 @@ public sealed class ApplicationService(AppDbContext db, ICurrentUser currentUser
 
     public async Task<bool> DeleteAsync(Guid id, CancellationToken ct)
     {
-        // ExecuteDeleteAsync issues a single DELETE ... WHERE without loading
-        // the row first. Status history goes with it (ON DELETE CASCADE).
-        var deleted = await Mine.Where(a => a.Id == id).ExecuteDeleteAsync(ct);
-        return deleted > 0;
+        // Loaded and removed through EF (not ExecuteDelete) so the outbox
+        // interceptor sees the delete and announces it. Status history goes
+        // with it (ON DELETE CASCADE in the database).
+        var application = await Mine.SingleOrDefaultAsync(a => a.Id == id, ct);
+        if (application is null) return false;
+        db.Applications.Remove(application);
+        await db.SaveChangesAsync(ct);
+        return true;
     }
 
     public async Task<ApplicationResponse?> ChangeStatusAsync(Guid id, ApplicationStatus status, CancellationToken ct)

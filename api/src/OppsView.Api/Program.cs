@@ -17,18 +17,22 @@ using OppsView.Api.Features.EmailImport.Gmail;
 using OppsView.Api.Features.EmailImport.Parsing;
 using OppsView.Api.Features.Matching;
 using OppsView.Api.Infrastructure;
+using OppsView.Api.Infrastructure.Messaging;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // ---- Database ----------------------------------------------------------
 // Locally the connection string comes from user-secrets; in CI/Azure from the
 // ConnectionStrings__Default environment variable. Never from appsettings.json.
-builder.Services.AddDbContext<AppDbContext>(options =>
+builder.Services.AddSingleton<OutboxInterceptor>();
+builder.Services.AddDbContext<AppDbContext>((services, options) =>
 {
     var connectionString = builder.Configuration.GetConnectionString("Default")
         ?? throw new InvalidOperationException(
             "Connection string 'Default' is missing. See api/README.md for how to set it with dotnet user-secrets.");
-    options.UseNpgsql(connectionString);
+    options.UseNpgsql(connectionString)
+        // Writes an outbox event with every application change (see OutboxInterceptor).
+        .AddInterceptors(services.GetRequiredService<OutboxInterceptor>());
 });
 
 // ---- Auth --------------------------------------------------------------
@@ -101,6 +105,12 @@ builder.Services.AddScoped<NoReplyChecker>();
 builder.Services.AddHostedService<NoReplyCheckService>();
 builder.Services.AddScoped<GmailSyncService>();
 builder.Services.AddScoped<ReviewService>();
+
+// ---- Events to RabbitMQ (transactional outbox) --------------------------
+builder.Services.AddOptions<RabbitMqOptions>().BindConfiguration(RabbitMqOptions.SectionName);
+builder.Services.AddSingleton<IMessagePublisher, RabbitMqPublisher>();
+builder.Services.AddScoped<OutboxDispatcher>();
+builder.Services.AddHostedService<OutboxPublisherService>();
 
 // ---- CV matcher (Python service) ----------------------------------------
 builder.Services.AddOptions<MatcherOptions>().BindConfiguration(MatcherOptions.SectionName);

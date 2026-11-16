@@ -53,6 +53,12 @@ public class JobApplication
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
 
+    /// <summary>
+    /// When the current status started (creation, or the last status change).
+    /// "No news for 7 days" reminders are counted from here.
+    /// </summary>
+    public DateTime StatusChangedAt { get; private set; }
+
     /// <summary>Read-only view; EF Core fills the private list behind it.</summary>
     public IReadOnlyList<StatusChange> History => _history;
 
@@ -79,6 +85,7 @@ public class JobApplication
             Status = ApplicationStatus.Applied,
             Source = source,
             CreatedAt = nowUtc,
+            StatusChangedAt = nowUtc,
         };
         application.ApplyDetails(company, role, platform, appliedOn, jobUrl, notes, nowUtc);
         return application;
@@ -116,6 +123,7 @@ public class JobApplication
         _history.Add(change);
         Status = newStatus;
         UpdatedAt = nowUtc;
+        StatusChangedAt = nowUtc;
         // Real news (interview, offer, rejection) means the employer did get
         // back to you, so a "no reply means unsuccessful" deadline is void.
         // "Viewed" isn't a reply, so the deadline still stands.
