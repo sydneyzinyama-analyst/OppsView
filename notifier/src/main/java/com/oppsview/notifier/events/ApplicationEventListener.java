@@ -9,7 +9,7 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Receives application events from RabbitMQ. Spring AMQP calls this for
+ * Receives application events (and users' reminder settings) from RabbitMQ. Spring AMQP calls this for
  * each message on the queue and acknowledges it only if the method returns
  * normally; if it throws, the message is retried (see application.yml) and
  * then moved to the dead-letter queue.
@@ -35,6 +35,8 @@ public class ApplicationEventListener {
                         handler.handleChanged(messageId, json.readValue(message.getBody(), ApplicationChangedEvent.class));
                 case "application.deleted" ->
                         handler.handleDeleted(messageId, json.readValue(message.getBody(), ApplicationDeletedEvent.class));
+                case "user.reminder-settings-changed" -> handler.handleSettingsChanged(messageId,
+                        json.readValue(message.getBody(), ReminderSettingsChangedEvent.class));
                 default -> {
                     // Not ours to handle (a newer event type): acknowledge and move on.
                 }

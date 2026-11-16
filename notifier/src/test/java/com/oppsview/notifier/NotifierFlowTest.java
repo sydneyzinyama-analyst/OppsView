@@ -68,6 +68,7 @@ class NotifierFlowTest {
         jdbc.sql("DELETE FROM reminder").update();
         jdbc.sql("DELETE FROM tracked_application").update();
         jdbc.sql("DELETE FROM processed_message").update();
+        jdbc.sql("DELETE FROM user_settings").update();
         clock.set(START);
         reset(publisher);
     }
@@ -193,5 +194,50 @@ class NotifierFlowTest {
     void unknown_event_types_are_ignored() {
         listener.onMessage(message("application.archived", "{}"));
         assertThat(store.findApplication(app)).isEmpty();
+    }
+
+    private Message settings(boolean enabled, int followUp, int moveOn, String occurredAt) {
+        return message("user.reminder-settings-changed", """
+                {"userId":"%s","enabled":%s,"followUpDays":%d,"moveOnDays":%d,"afterInterviewDays":5,
+                 "offerReplyDays":2,"occurredAt":"%s","version":1}
+                """.formatted(user, enabled, followUp, moveOn, occurredAt));
+    }
+
+    @Test
+    void a_users_own_follow_up_days_replan_their_reminders() {
+        listener.onMessage(changed("Applied", null, "2026-11-10T12:00:00Z", "2026-11-10T12:00:00Z"));
+
+        // The user wants to follow up after 3 days and never be told to move on.
+        listener.onMessage(settings(true, 3, 0, "2026-11-10T13:00:00Z"));
+
+        assertThat(store.remindersFor(app)).containsExactly("FOLLOW_UP");
+        clock.set(Instant.parse("2026-11-13T08:00:00Z")); // 3 days after applying
+        assertThat(job.sendDueReminders()).isEqualTo(1);
+    }
+
+    @Test
+    void new_applications_use_the_users_settings_too() {
+        listener.onMessage(settings(true, 3, 0, "2026-11-09T00:00:00Z"));
+        listener.onMessage(changed("Applied", null, "2026-11-10T12:00:00Z", "2026-11-10T12:00:00Z"));
+
+        assertThat(store.remindersFor(app)).containsExactly("FOLLOW_UP");
+    }
+
+    @Test
+    void switching_reminders_off_cancels_the_unsent_ones() {
+        listener.onMessage(changed("Applied", null, "2026-11-10T12:00:00Z", "2026-11-10T12:00:00Z"));
+
+        listener.onMessage(settings(false, 7, 21, "2026-11-10T13:00:00Z"));
+
+        assertThat(store.remindersFor(app)).isEmpty();
+    }
+
+    @Test
+    void an_older_settings_change_arriving_late_is_ignored() {
+        listener.onMessage(changed("Applied", null, "2026-11-10T12:00:00Z", "2026-11-10T12:00:00Z"));
+        listener.onMessage(settings(false, 7, 21, "2026-11-10T14:00:00Z"));
+        listener.onMessage(settings(true, 7, 21, "2026-11-10T13:00:00Z")); // older
+
+        assertThat(store.remindersFor(app)).isEmpty();
     }
 }

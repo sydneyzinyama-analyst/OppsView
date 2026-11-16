@@ -16,7 +16,8 @@ import org.springframework.context.annotation.Configuration;
  *
  * <pre>
  * exchange "oppsview.events" (topic)
- *   ├─ application.*  ─▶ queue "notifier.application-events" ─▶ this service
+ *   ├─ application.*, user.reminder-settings-changed
+ *   │                  ─▶ queue "notifier.application-events" ─▶ this service
  *   └─ reminder.due   ─▶ (the .NET API's own queue)
  * messages that keep failing ─▶ "oppsview.dead-letter" ─▶ queue "notifier.application-events.dlq"
  * </pre>
@@ -46,6 +47,11 @@ public class MessagingConfig {
     @Bean
     Binding applicationEventsBinding() {
         return BindingBuilder.bind(applicationEventsQueue()).to(eventsExchange()).with("application.*");
+    }
+
+    @Bean
+    Binding settingsBinding() {
+        return BindingBuilder.bind(applicationEventsQueue()).to(eventsExchange()).with("user.reminder-settings-changed");
     }
 
     @Bean

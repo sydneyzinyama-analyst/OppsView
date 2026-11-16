@@ -102,6 +102,59 @@ public class NotifierStore {
         jdbc.sql("DELETE FROM tracked_application WHERE application_id = :id").param("id", applicationId).update();
     }
 
+    public List<TrackedApplication> applicationsOf(UUID userId) {
+        return jdbc.sql("SELECT application_id FROM tracked_application WHERE user_id = :user")
+                .param("user", userId).query(UUID.class).list()
+                .stream().map(id -> findApplication(id).orElseThrow()).toList();
+    }
+
+    // ---- User settings ---------------------------------------------------
+
+    /** A user's own reminder choices, as received from the API. */
+    public record UserSettings(UUID userId, boolean enabled, int followUpDays, int moveOnDays, int afterInterviewDays,
+            int offerReplyDays, Instant lastEventAt) {
+    }
+
+    public Optional<UserSettings> findSettings(UUID userId) {
+        return jdbc.sql("""
+                SELECT user_id, enabled, follow_up_days, move_on_days, after_interview_days, offer_reply_days, last_event_at
+                FROM user_settings WHERE user_id = :user
+                """)
+                .param("user", userId)
+                .query((rs, n) -> new UserSettings(
+                        rs.getObject("user_id", UUID.class),
+                        rs.getBoolean("enabled"),
+                        rs.getInt("follow_up_days"),
+                        rs.getInt("move_on_days"),
+                        rs.getInt("after_interview_days"),
+                        rs.getInt("offer_reply_days"),
+                        rs.getObject("last_event_at", OffsetDateTime.class).toInstant()))
+                .optional();
+    }
+
+    public void saveSettings(UserSettings s) {
+        var params = new java.util.HashMap<String, Object>();
+        params.put("user", s.userId());
+        params.put("enabled", s.enabled());
+        params.put("followUp", s.followUpDays());
+        params.put("moveOn", s.moveOnDays());
+        params.put("afterInterview", s.afterInterviewDays());
+        params.put("offerReply", s.offerReplyDays());
+        params.put("eventAt", utc(s.lastEventAt()));
+        var updated = jdbc.sql("""
+                UPDATE user_settings SET enabled = :enabled, follow_up_days = :followUp, move_on_days = :moveOn,
+                    after_interview_days = :afterInterview, offer_reply_days = :offerReply, last_event_at = :eventAt
+                WHERE user_id = :user
+                """).params(params).update();
+        if (updated == 0) {
+            jdbc.sql("""
+                    INSERT INTO user_settings
+                        (user_id, enabled, follow_up_days, move_on_days, after_interview_days, offer_reply_days, last_event_at)
+                    VALUES (:user, :enabled, :followUp, :moveOn, :afterInterview, :offerReply, :eventAt)
+                    """).params(params).update();
+        }
+    }
+
     // ---- Reminders -------------------------------------------------------
 
     /**

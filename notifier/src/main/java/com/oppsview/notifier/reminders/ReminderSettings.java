@@ -26,4 +26,14 @@ public record ReminderSettings(
         @DefaultValue("7") int maxOverdueDays) {
 
     public static final ReminderSettings DEFAULTS = new ReminderSettings(7, 21, 5, 2, 8, 7);
+
+    /** These settings with a user's own day counts (time of day and overdue rule stay global). */
+    public ReminderSettings forUser(int followUp, int moveOn, int afterInterview, int offerReply) {
+        return new ReminderSettings(followUp, moveOn, afterInterview, offerReply, hourUtc, maxOverdueDays);
+    }
+
+    /** Everything off: used when a user switches reminders off. */
+    public ReminderSettings allOff() {
+        return forUser(0, 0, 0, 0);
+    }
 }
