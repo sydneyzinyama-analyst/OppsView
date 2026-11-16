@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using OppsView.Api.Domain;
+using OppsView.Api.Infrastructure.Messaging;
 
 namespace OppsView.Api.Data;
 
@@ -11,6 +12,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<ImportedEmail> ImportedEmails => Set<ImportedEmail>();
     public DbSet<GmailConnection> GmailConnections => Set<GmailConnection>();
     public DbSet<Cv> Cvs => Set<Cv>();
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+    public DbSet<Reminder> Reminders => Set<Reminder>();
+    public DbSet<ReminderSettings> ReminderSettings => Set<ReminderSettings>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -177,3 +177,24 @@ form[aria-label='Match a job ad'] { display: grid; gap: 1rem; }
 .saved-match h3 { margin: 0 0 0.75rem; font-size: 1rem; }
 a.link { padding: 0.2rem 0.4rem; color: var(--primary); text-decoration: none; }
 a.link:hover { text-decoration: underline; }
+
+/* Reminders */
+.bell { position: relative; font-size: 1.2rem; text-decoration: none; padding: 0.25rem 0.4rem; border-radius: 8px; }
+.bell:hover, .bell.active { background: var(--bg); }
+.bell-count { position: absolute; top: -0.2rem; right: -0.3rem; min-width: 1.1rem; height: 1.1rem; padding: 0 0.25rem;
+  border-radius: 999px; background: var(--danger); color: #fff; font-size: 0.7rem; font-weight: 700;
+  display: grid; place-items: center; }
+.reminders { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.75rem; }
+.reminder { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; border: 1px solid var(--border);
+  border-left: 4px solid var(--primary); border-radius: 8px; padding: 0.75rem 1rem; }
+.reminder p { margin: 0.35rem 0; }
+.reminder-actions { display: flex; align-items: center; gap: 0.5rem; }
+.reminder-settings { display: grid; gap: 1rem; }
+.reminder-settings fieldset { border: none; padding: 0; margin: 0; display: grid; gap: 0.75rem; }
+.reminder-settings fieldset:disabled { opacity: 0.55; }
+.settings-row { grid-template-columns: 12rem 5rem 1fr; align-items: center; column-gap: 0.75rem; }
+.settings-row .field-error { grid-column: 1 / -1; }
+.toggle { display: flex; align-items: center; gap: 0.5rem; font-weight: 600; }
+.toggle input { width: auto; }
+@media (max-width: 760px) { .settings-row { grid-template-columns: 1fr 5rem; } .settings-row .muted { grid-column: 1 / -1; } }
+.applications tr.highlight td { background: var(--applied-bg); }

@@ -54,6 +54,11 @@ describe('ApplicationList', () => {
     expect(screen.getByRole('link', { name: 'Match CV' })).toHaveAttribute('href', '/match?applicationId=a9')
   })
 
+  it('highlights the application a reminder linked to', () => {
+    renderList({ highlightId: 'a2' })
+    expect(screen.getByRole('link', { name: 'Globex' }).closest('tr')).toHaveClass('highlight')
+  })
+
   it('labels applications that came from email', () => {
     renderList({ applications: [makeApplication({ source: 'Email' })] })
     expect(screen.getByText('from email')).toBeInTheDocument()

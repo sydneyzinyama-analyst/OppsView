@@ -25,8 +25,10 @@ export function ApplicationsPage() {
   // Read it once for the banner, then tidy the URL.
   const [searchParams, setSearchParams] = useSearchParams()
   const [connectResult] = useState(() => CONNECT_RESULTS[searchParams.get('gmail') ?? ''] ?? null)
+  // A reminder's "View application" link: /?highlight=<id>.
+  const [highlightId] = useState(() => searchParams.get('highlight'))
   useEffect(() => {
-    if (searchParams.has('gmail')) setSearchParams({}, { replace: true })
+    if (searchParams.has('gmail') || searchParams.has('highlight')) setSearchParams({}, { replace: true })
   }, [searchParams, setSearchParams])
 
   // Bumping this reloads everything (Retry button, after a sync or review).
@@ -139,6 +141,7 @@ export function ApplicationsPage() {
           ) : (
             <ApplicationList
               applications={applications}
+              highlightId={highlightId}
               onUpdate={handleUpdate}
               onDelete={handleDelete}
               onChangeStatus={handleChangeStatus}

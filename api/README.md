@@ -4,7 +4,7 @@ ASP.NET Core 10 Web API with EF Core 10 and PostgreSQL. .NET 10 is the current l
 
 ## Endpoints
 
-All `/applications`, `/email`, `/cv` and `/match` endpoints (except the Google callback) need `Authorization: Bearer <token>`. In Swagger, call `/auth/login`, then click **Authorize** and paste the token.
+All `/applications`, `/email`, `/cv`, `/match` and `/reminders` endpoints (except the Google callback) need `Authorization: Bearer <token>`. In Swagger, call `/auth/login`, then click **Authorize** and paste the token.
 
 | Method | Route | Description |
 |---|---|---|
@@ -29,6 +29,10 @@ All `/applications`, `/email`, `/cv` and `/match` endpoints (except the Google c
 | PUT | `/cv` | Upload or replace your CV (multipart `file`: PDF, .docx, .txt, max 5 MB). The matcher reads it, and only the text is kept. 400 if it can't be read. |
 | DELETE | `/cv` | Remove your CV. |
 | POST | `/match` | `{ jobAd, applicationId? }`: match your CV against the ad. With `applicationId`, the score and result are saved on that application (`matchScore`). 409 without a CV, 503 if the matcher isn't running. |
+| GET | `/reminders` | Follow-up reminders under the bell: open, not snoozed, and still relevant to the application's status. |
+| GET | `/reminders/count` | `{ open }` for the bell's badge. |
+| POST | `/reminders/{id}/done` · `/dismiss` · `/snooze` | Close a reminder, or hide it for `{ days }` (1–30). |
+| GET / PUT | `/reminders/settings` | `{ enabled, followUpDays, moveOnDays, afterInterviewDays, offerReplyDays }` (0 = off). Saving announces the change to the notifier. |
 | GET | `/applications/{id}/match` | The match saved on an application (the ad and the full result). |
 
 Errors use [RFC 7807 problem details](https://www.rfc-editor.org/rfc/rfc7807). A validation error is a 400 with camelCase field names, for example `{ "errors": { "appliedOn": ["Applied date can't be in the future."] } }`. Data annotation failures and domain rule failures produce the same shape.
@@ -52,12 +56,14 @@ src/OppsView.Api/
   Features/
     Applications/  Controller, service and DTOs for applications
     Auth/          Register/login, JWT issuing, options
+    Reminders/     Reminders from the notifier: RabbitMQ consumer, inbox, service, settings
     Matching/      CV upload and matching: MatcherClient (HTTP to the Python matcher), service, controller
     EmailImport/   Gmail import:
       Parsing/       Rule-based email parser (text cleaning, classifier, company/role/platform)
       Gmail/         Google OAuth, Gmail API calls, sync service
       EmailImporter  Turns parsed emails into application changes (or "needs review")
-  Infrastructure/  Cross-cutting pieces: current user, DomainException → 400 filter
+  Infrastructure/  Cross-cutting pieces: current user, DomainException → 400 filter,
+                   Messaging/ (outbox interceptor, dispatcher, RabbitMQ publisher, event types)
   Program.cs       Composition root: DI, auth, JSON, CORS, Swagger
 tests/OppsView.Api.Tests/
   Domain/          Unit tests for entities and transition rules
@@ -91,6 +97,8 @@ The folders group code **by feature** (`Features/Applications`), not by technica
 | `Google:RedirectUri` | default `http://localhost:5226/email/google/callback` | Must match the Google Cloud console exactly |
 | `Google:WebAppUrl` | default `http://localhost:5173` | Where the browser goes after connecting |
 | `Google:InitialSyncDays`, `Google:MaxMessagesPerSync` | defaults 60 and 200 | |
+| `RabbitMq:Url` | user-secrets / env `RabbitMq__Url` | **Secret.** `amqps://user:pass@host/vhost`. Optional: without it, events wait in the outbox |
+| `Outbox:PollSeconds` | default 5 | How often waiting events are sent; 0 turns the sender off |
 | `Matcher:BaseUrl` | default `http://localhost:8000` | Where the Python matcher runs |
 | `Matcher:ApiKey` | user-secrets / env `Matcher__ApiKey` | Optional shared key; must equal the matcher's `MATCHER_API_KEY` |
 | `EmailImport:NoReplyCheckMinutes` | default 60 | How often the background job applies passed "no reply by X" deadlines; 0 turns it off |
@@ -105,3 +113,15 @@ dotnet ef migrations add <Name> --project src/OppsView.Api --output-dir Data/Mig
 dotnet ef database update --project src/OppsView.Api
 dotnet user-secrets list --project src/OppsView.Api
 ```
+
+## Events (RabbitMQ)
+
+The API publishes to the durable topic exchange `oppsview.events` through a **transactional outbox**:
+
+| Routing key | When | Payload |
+|---|---|---|
+| `application.changed` | Created, or status / company / role / platform / applied date changed | The application's full state, plus `previousStatus` |
+| `application.deleted` | Deleted | `applicationId`, `userId` |
+| `user.reminder-settings-changed` | Reminder settings saved | The settings |
+
+It consumes `reminder.due` (from the notifier) on its own queue, `api.reminders`, with dead-letter queue `api.reminders.dlq`. Every message carries a `MessageId`, and consumers ignore duplicates. Without `RabbitMq:Url`, events wait in `OutboxMessages` (pruned after 30 days).

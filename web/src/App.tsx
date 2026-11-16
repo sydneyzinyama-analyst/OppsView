@@ -4,6 +4,7 @@ import { AppLayout } from './components/AppLayout'
 import { ApplicationsPage } from './pages/ApplicationsPage'
 import { AuthPage } from './pages/AuthPage'
 import { MatchPage } from './pages/MatchPage'
+import { RemindersPage } from './pages/RemindersPage'
 
 export default function App() {
   return (
@@ -26,6 +27,16 @@ export default function App() {
           <RequireAuth>
             <AppLayout>
               <MatchPage />
+            </AppLayout>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/reminders"
+        element={
+          <RequireAuth>
+            <AppLayout>
+              <RemindersPage />
             </AppLayout>
           </RequireAuth>
         }

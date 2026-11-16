@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.DataProtection;
 using OppsView.Api.Data;
 using OppsView.Api.Features.EmailImport.Gmail;
 using OppsView.Api.Features.Matching;
+using OppsView.Api.Infrastructure.Messaging;
 
 namespace OppsView.Api.Tests.Api;
 
@@ -40,6 +41,9 @@ public sealed class OppsViewApiFactory : WebApplicationFactory<Program>
     /// <summary>Pretend Python matcher for the CV matching tests.</summary>
     public FakeMatcher Matcher { get; } = new();
 
+    /// <summary>Pretend RabbitMQ for the outbox tests.</summary>
+    public FakePublisher Publisher { get; } = new();
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
@@ -48,6 +52,7 @@ public sealed class OppsViewApiFactory : WebApplicationFactory<Program>
         builder.UseSetting("Google:ClientSecret", "test-client-secret");
         // Tests run the no-reply check themselves; no background timer.
         builder.UseSetting("EmailImport:NoReplyCheckMinutes", "0");
+        builder.UseSetting("Outbox:PollSeconds", "0"); // tests run the dispatcher themselves
 
         builder.ConfigureServices(services =>
         {
@@ -56,7 +61,9 @@ public sealed class OppsViewApiFactory : WebApplicationFactory<Program>
             // so both have to go or Npgsql would still be configured.
             services.RemoveAll<DbContextOptions<AppDbContext>>();
             services.RemoveAll<IDbContextOptionsConfiguration<AppDbContext>>();
-            services.AddDbContext<AppDbContext>(options => options.UseSqlite(_connection));
+            // Same outbox interceptor as the real app, so events are written in tests too.
+            services.AddDbContext<AppDbContext>((sp, options) =>
+                options.UseSqlite(_connection).AddInterceptors(sp.GetRequiredService<OutboxInterceptor>()));
 
             services.RemoveAll<TimeProvider>();
             services.AddSingleton<TimeProvider>(Time);
@@ -68,6 +75,9 @@ public sealed class OppsViewApiFactory : WebApplicationFactory<Program>
 
             services.RemoveAll<IMatcherClient>();
             services.AddSingleton<IMatcherClient>(Matcher);
+
+            services.RemoveAll<IMessagePublisher>();
+            services.AddSingleton<IMessagePublisher>(Publisher);
 
             // Encryption keys in memory only, instead of the user profile.
             services.AddDataProtection().UseEphemeralDataProtectionProvider();

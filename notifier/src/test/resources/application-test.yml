@@ -1,0 +1,18 @@
+# Test settings (profile "test", added on top of the main application.yml): H2 in-memory database instead of PostgreSQL, RabbitMQ
+# listeners off, and the scheduled job effectively paused (tests call it).
+spring:
+  config:
+    import: ""
+  datasource:
+    # Single quotes: YAML keeps the backslash, which H2 needs between INIT statements.
+    url: 'jdbc:h2:mem:notifier;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1;INIT=CREATE SCHEMA IF NOT EXISTS notifier\;SET SCHEMA notifier'
+    username: sa
+    password: ""
+  rabbitmq:
+    listener:
+      simple:
+        auto-startup: false
+
+notifier:
+  check-interval: P365D
+  initial-delay: P365D

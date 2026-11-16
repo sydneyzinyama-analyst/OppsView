@@ -1,0 +1,8 @@
+# Copy this file to local.properties (same folder) and fill in your values.
+# local.properties is git-ignored: it holds secrets.
+
+# Your PostgreSQL password for the oppsview user (same one as in the API's user-secrets)
+spring.datasource.password=YOUR_DB_PASSWORD
+
+# Your CloudAMQP "AMQP URL" (starts with amqps://)
+spring.rabbitmq.addresses=amqps://USER:PASSWORD@HOST/VHOST

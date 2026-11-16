@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { PLATFORM_LABELS, type Application, type ApplicationStatus, type SaveApplicationRequest } from '../api/types'
 import { formatDate } from '../lib/dates'
@@ -10,6 +10,8 @@ import { StatusSelect } from './StatusSelect'
 
 interface Props {
   applications: Application[]
+  /** Scroll to and highlight this application (from a reminder's link). */
+  highlightId?: string | null
   onUpdate: (id: string, body: SaveApplicationRequest) => Promise<void>
   onDelete: (id: string) => Promise<void>
   onChangeStatus: (id: string, status: ApplicationStatus) => Promise<void>
@@ -17,9 +19,13 @@ interface Props {
 
 type Expanded = { id: string; view: 'edit' | 'history' } | null
 
-export function ApplicationList({ applications, onUpdate, onDelete, onChangeStatus }: Props) {
+export function ApplicationList({ applications, highlightId, onUpdate, onDelete, onChangeStatus }: Props) {
   const [expanded, setExpanded] = useState<Expanded>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (highlightId) document.getElementById(`application-${highlightId}`)?.scrollIntoView?.({ block: 'center' })
+  }, [highlightId])
 
   if (applications.length === 0) {
     return <p className="empty">No applications yet. Add your first one above.</p>
@@ -62,7 +68,10 @@ export function ApplicationList({ applications, onUpdate, onDelete, onChangeStat
             const isOpen = expanded?.id === a.id
             return (
               <Fragment key={a.id}>
-                <tr className={isOpen ? 'open' : undefined}>
+                <tr
+                  id={`application-${a.id}`}
+                  className={[isOpen && 'open', a.id === highlightId && 'highlight'].filter(Boolean).join(' ') || undefined}
+                >
                   <td data-label="Company">
                     {a.jobUrl ? (
                       <a href={a.jobUrl} target="_blank" rel="noreferrer noopener">
