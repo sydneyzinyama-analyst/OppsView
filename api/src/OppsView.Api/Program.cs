@@ -16,6 +16,7 @@ using OppsView.Api.Features.EmailImport;
 using OppsView.Api.Features.EmailImport.Gmail;
 using OppsView.Api.Features.EmailImport.Parsing;
 using OppsView.Api.Features.Matching;
+using OppsView.Api.Features.Reminders;
 using OppsView.Api.Infrastructure;
 using OppsView.Api.Infrastructure.Messaging;
 
@@ -111,6 +112,11 @@ builder.Services.AddOptions<RabbitMqOptions>().BindConfiguration(RabbitMqOptions
 builder.Services.AddSingleton<IMessagePublisher, RabbitMqPublisher>();
 builder.Services.AddScoped<OutboxDispatcher>();
 builder.Services.AddHostedService<OutboxPublisherService>();
+
+// ---- Reminders from the notifier (Java) -----------------------------------
+builder.Services.AddScoped<ReminderInbox>();
+builder.Services.AddScoped<ReminderService>();
+builder.Services.AddHostedService<ReminderConsumer>();
 
 // ---- CV matcher (Python service) ----------------------------------------
 builder.Services.AddOptions<MatcherOptions>().BindConfiguration(MatcherOptions.SectionName);

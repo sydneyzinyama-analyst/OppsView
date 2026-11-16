@@ -9,7 +9,8 @@ namespace OppsView.Api.Infrastructure.Messaging;
 
 /// <summary>
 /// Hooks into every SaveChanges (an EF Core "interceptor") and writes an
-/// outbox event for each application that was added, changed or deleted.
+/// outbox event for each application that was added, changed or deleted,
+/// and for each change to a user's reminder settings.
 ///
 /// Doing it here, rather than in each service, means no code path can forget:
 /// manual edits, status changes, email import and "no reply" rejections all
@@ -66,6 +67,15 @@ public sealed class OutboxInterceptor(TimeProvider time) : SaveChangesIntercepto
                     break;
             }
         }
+        foreach (var entry in context.ChangeTracker.Entries<ReminderSettings>())
+        {
+            if (entry.State is not (EntityState.Added or EntityState.Modified)) continue;
+            var r = entry.Entity;
+            messages.Add(OutboxMessage.Create(EventTypes.ReminderSettingsChanged, JsonSerializer.Serialize(
+                new ReminderSettingsChangedEvent(r.UserId, r.Enabled, r.FollowUpDays, r.MoveOnDays, r.AfterInterviewDays,
+                    r.OfferReplyDays, now), Json), now));
+        }
+
         context.Set<OutboxMessage>().AddRange(messages);
     }
 

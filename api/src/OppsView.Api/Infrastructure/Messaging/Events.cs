@@ -15,6 +15,10 @@ public static class EventTypes
     public const string Exchange = "oppsview.events";
     public const string ApplicationChanged = "application.changed";
     public const string ApplicationDeleted = "application.deleted";
+    public const string ReminderSettingsChanged = "user.reminder-settings-changed";
+
+    /// <summary>Sent by the notifier; the API listens for it.</summary>
+    public const string ReminderDue = "reminder.due";
 }
 
 /// <summary>Sent when an application is created, or its status or main details change.</summary>
@@ -32,3 +36,26 @@ public sealed record ApplicationChangedEvent(
     int Version = 1);
 
 public sealed record ApplicationDeletedEvent(Guid ApplicationId, Guid UserId, DateTime OccurredAt, int Version = 1);
+
+/// <summary>Sent when a user changes their reminder settings, so the notifier re-plans.</summary>
+public sealed record ReminderSettingsChangedEvent(
+    Guid UserId,
+    bool Enabled,
+    int FollowUpDays,
+    int MoveOnDays,
+    int AfterInterviewDays,
+    int OfferReplyDays,
+    DateTime OccurredAt,
+    int Version = 1);
+
+/// <summary>"reminder.due" from the notifier (incoming).</summary>
+public sealed record ReminderDueEvent(
+    Guid ReminderId,
+    Guid ApplicationId,
+    Guid UserId,
+    string Kind,
+    string Company,
+    string Role,
+    string Message,
+    DateTime DueAt,
+    int Version);

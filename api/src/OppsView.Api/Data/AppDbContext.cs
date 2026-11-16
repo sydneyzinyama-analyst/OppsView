@@ -13,6 +13,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<GmailConnection> GmailConnections => Set<GmailConnection>();
     public DbSet<Cv> Cvs => Set<Cv>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+    public DbSet<Reminder> Reminders => Set<Reminder>();
+    public DbSet<ReminderSettings> ReminderSettings => Set<ReminderSettings>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
