@@ -144,3 +144,26 @@ export interface SavedMatch {
   jobAd: string
   result: MatchResult
 }
+
+// ---- Reminders (from the Java notifier) -----------------------------------
+
+export type ReminderKind = 'FOLLOW_UP' | 'MOVE_ON' | 'AFTER_INTERVIEW' | 'REPLY_TO_OFFER'
+
+export interface Reminder {
+  id: string
+  applicationId: string
+  company: string
+  role: string
+  kind: ReminderKind
+  message: string
+  dueAt: string
+}
+
+export interface ReminderSettings {
+  enabled: boolean
+  /** Days; 0 switches that reminder off. */
+  followUpDays: number
+  moveOnDays: number
+  afterInterviewDays: number
+  offerReplyDays: number
+}
