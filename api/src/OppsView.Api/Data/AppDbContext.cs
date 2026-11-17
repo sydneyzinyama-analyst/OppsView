@@ -1,11 +1,19 @@
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using OppsView.Api.Domain;
 using OppsView.Api.Infrastructure.Messaging;
 
 namespace OppsView.Api.Data;
 
-public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
+/// <remarks>
+/// IDataProtectionKeyContext: ASP.NET Core Data Protection keeps its
+/// encryption keys (used for Gmail tokens and the OAuth state) in the
+/// DataProtectionKeys table, so they survive container restarts in the cloud.
+/// </remarks>
+public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options), IDataProtectionKeyContext
 {
+    public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
+
     public DbSet<User> Users => Set<User>();
     public DbSet<JobApplication> Applications => Set<JobApplication>();
     public DbSet<StatusChange> StatusHistory => Set<StatusChange>();

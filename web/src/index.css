@@ -47,7 +47,9 @@ h1, h2 { margin: 0 0 1rem; line-height: 1.2; }
 h2 { font-size: 1.15rem; }
 a { color: var(--primary); }
 
-.container { max-width: 1080px; margin: 0 auto; padding: 1.5rem 1rem 3rem; display: grid; gap: 1.5rem; }
+.container { max-width: 1080px; margin: 0 auto; padding: 1.5rem 1rem 3rem; display: grid; gap: 1.5rem;
+  /* One column that may shrink below its content's natural width (no sideways scroll on phones). */
+  grid-template-columns: minmax(0, 1fr); }
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; }
 .muted { color: var(--muted); }
 .count { color: var(--muted); font-weight: 500; font-size: 0.95rem; }
@@ -198,3 +200,51 @@ a.link:hover { text-decoration: underline; }
 .toggle input { width: auto; }
 @media (max-width: 760px) { .settings-row { grid-template-columns: 1fr 5rem; } .settings-row .muted { grid-column: 1 / -1; } }
 .applications tr.highlight td { background: var(--applied-bg); }
+
+/* Insights (charts). One measure per chart, so one series colour: the
+   reference palette's slot 1, stepped for light and dark surfaces. */
+:root { --viz-series-1: #2a78d6; --viz-track: #eceae6; }
+@media (prefers-color-scheme: dark) { :root { --viz-series-1: #3987e5; --viz-track: #2a3445; } }
+.insights { gap: 1.25rem; }
+.stat-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; }
+.stat-tile { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem;
+  display: grid; gap: 0.15rem; }
+.stat-value { font-size: 2rem; font-weight: 800; line-height: 1.1; color: var(--text); }
+.stat-label { font-weight: 600; }
+.chart-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.25rem; }
+.chart { margin: 0 0 1.25rem; }
+.chart:last-child { margin-bottom: 0; }
+.chart-title { font-size: 1rem; font-weight: 700; margin: 0 0 0.75rem; }
+.bar-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
+.bar-row { display: grid; grid-template-columns: minmax(6rem, 9rem) 1fr 3.5rem; align-items: center; gap: 0.6rem; font-size: 0.9rem; }
+.bar-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar-value { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+.bar-track { position: relative; height: 0.75rem; background: var(--viz-track); border-radius: 4px; outline-offset: 2px; }
+.bar-fill { display: block; height: 100%; min-width: 2px; background: var(--viz-series-1); border-radius: 0 4px 4px 0; }
+.columns { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 2px; height: 11rem; align-items: end; }
+.column { position: relative; height: 100%; display: grid; grid-template-rows: 1.2rem 1fr 1.4rem; align-items: end; outline-offset: 2px; }
+.column-fill { display: block; width: 70%; justify-self: center; min-height: 0; background: var(--viz-series-1);
+  border-radius: 4px 4px 0 0; align-self: end; }
+.column-value { font-size: 0.75rem; text-align: center; color: var(--muted); align-self: end; }
+.column-label { font-size: 0.7rem; color: var(--muted); text-align: center; white-space: nowrap; align-self: start;
+  border-top: 1px solid var(--border); padding-top: 0.15rem; }
+/* Hover / keyboard-focus tooltip with the exact value. */
+[data-tip]:hover::after, [data-tip]:focus-visible::after {
+  content: attr(data-tip); position: absolute; z-index: 2; left: 50%; bottom: calc(100% + 6px); transform: translateX(-50%);
+  width: max-content; max-width: min(14rem, 70vw); padding: 0.3rem 0.5rem; border-radius: 6px; font-size: 0.8rem;
+  color: var(--surface); background: var(--text); pointer-events: none; }
+.waiting-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; margin-bottom: 0.75rem; }
+.waiting-table th, .waiting-table td { text-align: left; padding: 0.35rem 0.25rem; border-bottom: 1px solid var(--border); }
+.waiting-table th { font-size: 0.75rem; text-transform: uppercase; color: var(--muted); }
+.column-label { overflow: hidden; }
+@media (max-width: 760px) {
+  .stat-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .chart-grid { grid-template-columns: 1fr; }
+  /* Twelve dates don't fit side by side on a phone: label every other week. */
+  .column:nth-child(even) .column-label { color: transparent; }
+  .column-label { font-size: 0.65rem; overflow: visible; }
+  .bar-row { grid-template-columns: minmax(5rem, 7rem) 1fr 3rem; }
+  .waiting-table { font-size: 0.8rem; }
+  /* The signed-in email isn't needed in the header on a phone. */
+  .topbar .user .muted { display: none; }
+}

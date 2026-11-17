@@ -53,6 +53,8 @@ public sealed class OppsViewApiFactory : WebApplicationFactory<Program>
         // Tests run the no-reply check themselves; no background timer.
         builder.UseSetting("EmailImport:NoReplyCheckMinutes", "0");
         builder.UseSetting("Outbox:PollSeconds", "0"); // tests run the dispatcher themselves
+        // Every test registers users from the same "IP"; the rate limit has its own test.
+        builder.UseSetting("RateLimiting:AuthPerMinute", "100000");
 
         builder.ConfigureServices(services =>
         {

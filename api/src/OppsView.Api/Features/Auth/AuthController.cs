@@ -1,9 +1,17 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace OppsView.Api.Features.Auth;
 
+public static class AuthRateLimit
+{
+    public const string Policy = "auth";
+}
+
 [ApiController]
 [Route("auth")]
+[EnableRateLimiting(AuthRateLimit.Policy)] // see Program.cs: 10 per minute per IP by default
+[ProducesResponseType(StatusCodes.Status429TooManyRequests)]
 public sealed class AuthController(IAuthService auth) : ControllerBase
 {
     /// <summary>Create an account and get a token straight away.</summary>

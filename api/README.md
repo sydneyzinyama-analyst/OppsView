@@ -33,6 +33,8 @@ All `/applications`, `/email`, `/cv`, `/match` and `/reminders` endpoints (excep
 | GET | `/reminders/count` | `{ open }` for the bell's badge. |
 | POST | `/reminders/{id}/done` · `/dismiss` · `/snooze` | Close a reminder, or hide it for `{ days }` (1–30). |
 | GET / PUT | `/reminders/settings` | `{ enabled, followUpDays, moveOnDays, afterInterviewDays, offerReplyDays }` (0 = off). Saving announces the change to the notifier. |
+| GET | `/analytics?weeks=12` | Insights: totals, applications per week, response rate by platform, funnel, where rejections happen, waiting times, top missing skills, email vs manual. |
+| GET | `/health` · `/health/ready` | Anonymous. "Up", and "up and the database answers": for the hosting platform's probes. |
 | GET | `/applications/{id}/match` | The match saved on an application (the ad and the full result). |
 
 Errors use [RFC 7807 problem details](https://www.rfc-editor.org/rfc/rfc7807). A validation error is a 400 with camelCase field names, for example `{ "errors": { "appliedOn": ["Applied date can't be in the future."] } }`. Data annotation failures and domain rule failures produce the same shape.
@@ -57,6 +59,7 @@ src/OppsView.Api/
     Applications/  Controller, service and DTOs for applications
     Auth/          Register/login, JWT issuing, options
     Reminders/     Reminders from the notifier: RabbitMQ consumer, inbox, service, settings
+    Analytics/     The Insights numbers (GET /analytics)
     Matching/      CV upload and matching: MatcherClient (HTTP to the Python matcher), service, controller
     EmailImport/   Gmail import:
       Parsing/       Rule-based email parser (text cleaning, classifier, company/role/platform)
@@ -97,6 +100,7 @@ The folders group code **by feature** (`Features/Applications`), not by technica
 | `Google:RedirectUri` | default `http://localhost:5226/email/google/callback` | Must match the Google Cloud console exactly |
 | `Google:WebAppUrl` | default `http://localhost:5173` | Where the browser goes after connecting |
 | `Google:InitialSyncDays`, `Google:MaxMessagesPerSync` | defaults 60 and 200 | |
+| `RateLimiting:AuthPerMinute` | default 10 | Login / register attempts per minute per client IP; more get 429 |
 | `RabbitMq:Url` | user-secrets / env `RabbitMq__Url` | **Secret.** `amqps://user:pass@host/vhost`. Optional: without it, events wait in the outbox |
 | `Outbox:PollSeconds` | default 5 | How often waiting events are sent; 0 turns the sender off |
 | `Matcher:BaseUrl` | default `http://localhost:8000` | Where the Python matcher runs |
@@ -125,3 +129,12 @@ The API publishes to the durable topic exchange `oppsview.events` through a **tr
 | `user.reminder-settings-changed` | Reminder settings saved | The settings |
 
 It consumes `reminder.due` (from the notifier) on its own queue, `api.reminders`, with dead-letter queue `api.reminders.dlq`. Every message carries a `MessageId`, and consumers ignore duplicates. Without `RabbitMq:Url`, events wait in `OutboxMessages` (pruned after 30 days).
+
+## Container image
+
+```bash
+docker build -t oppsview-api .     # from api/
+docker run -p 8080:8080 -e ConnectionStrings__Default="..." -e Jwt__SigningKey="..." oppsview-api
+```
+
+Two stages: build with the .NET SDK, run on the ASP.NET runtime image as the non-root `app` user, on port 8080. CI builds it on every push.
