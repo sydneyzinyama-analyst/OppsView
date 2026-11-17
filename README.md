@@ -1,12 +1,14 @@
 # OppsView
 
+[![CI](https://github.com/sydneyzinyama-analyst/OppsView/actions/workflows/ci.yml/badge.svg)](https://github.com/sydneyzinyama-analyst/OppsView/actions/workflows/ci.yml)
+
 **Every email is an opportunity.**
 
 Job hunting means sending dozens of applications across Pnet, Indeed, LinkedIn, Workable and company portals, then losing track of which ones replied. OppsView keeps them all in one place, and fills itself in: it reads the confirmation, rejection and interview emails in your inbox, adds each application automatically and keeps its status up to date. You can still add or correct applications by hand.
 
-Every application moves through the pipeline (Applied, Viewed, Interview, Offer, Rejected) with a full history of every status change. Later phases add a CV matcher that scores your CV against a job ad and lists the skills you're missing, follow-up reminders when a company goes quiet, and a dashboard that shows your response rate by platform and where your applications stall.
+Every application moves through the pipeline (Applied, Viewed, Interview, Offer, Rejected) with a full history of every status change. A CV matcher scores your CV against a job ad and lists the skills you're missing. Follow-up reminders nudge you when a company goes quiet. An Insights page shows your applications per week, response rate by platform, where applications stall, and the skills you're most often missing.
 
-![OppsView: follow-up reminders under the bell](docs/screenshot-phase4.png)
+![OppsView Insights: applications per week, response rate by platform, where applications stall](docs/screenshot-phase5-insights.png)
 
 This repository is a portfolio project, built in phases. Each phase adds a service in a different stack.
 
@@ -17,30 +19,30 @@ This repository is a portfolio project, built in phases. Each phase adds a servi
 | 2 | Email import: read confirmation, rejection and interview emails from Pnet, Indeed, Workable, LinkedIn and company portals, and create or update applications automatically | Gmail API (OAuth, read-only), in the .NET API | ✅ done |
 | 3 | [`matcher/`](matcher/README.md): CV vs job ad match score and missing skills | Python, FastAPI | ✅ done |
 | 4 | [`notifier/`](notifier/README.md): follow-up reminders after N days | Java, Spring Boot, RabbitMQ | ✅ done |
-| 5 | [`dashboard/`](dashboard/README.md): analytics, plus CI and Azure deployment | Angular, GitHub Actions, Azure | planned |
+| 5 | Insights charts (in the React app), CI on every push, container images, Azure deployment | React, GitHub Actions, Docker, Azure | in progress: Azure deployment next |
 
 ## Architecture
 
+```mermaid
+flowchart LR
+    user([Browser]) -->|HTTPS + JWT| web[React + Vite<br/>web app]
+    web -->|REST / JSON| api[ASP.NET Core 10 API<br/>C#]
+    api -->|EF Core| db[(PostgreSQL)]
+    api -->|read-only OAuth| gmail[[Gmail API]]
+    api -->|HTTP + shared key| matcher[CV matcher<br/>Python · FastAPI]
+    api -->|outbox → application.*| mq{{RabbitMQ<br/>oppsview.events}}
+    mq -->|application.*| notifier[Notifier<br/>Java · Spring Boot]
+    notifier -->|reminder.due| mq
+    mq -->|reminder.due| api
+    notifier -->|own schema| db
 ```
- Browser                       ASP.NET Core 10 API                    PostgreSQL
-┌──────────────┐  HTTPS/JSON  ┌──────────────────────────────────┐   ┌──────────────────┐
-│ React + Vite │ ───────────▶ │ Controllers (thin)               │   │ Users            │
-│  :5173       │  Bearer JWT  │   → Services (use cases, scoped  │──▶│ Applications     │
-│              │ ◀─────────── │       to the signed-in user)     │   │ StatusHistory    │
-└──────────────┘              │   → Domain (entities + rules)    │   │ ImportedEmails   │
-                              │   → EF Core (AppDbContext)       │   │ GmailConnections │
-                              │                                  │   │ Cvs, Reminders   │
-                              │ Email import:                    │   │ OutboxMessages   │
-                              │   Gmail API → parser → importer ─┼──▶│ notifier.* ◀─┐   │
-                              │ CV matching:                     │   └──────────────┼───┘
-                              │   MatcherClient ─────────────────┼──▶ Python matcher (FastAPI) :8000
-                              │ Events:                          │                  │
-                              │   outbox → RabbitMQ publisher ───┼──┐               │
-                              │   reminder consumer ◀────────────┼┐ │               │
-                              │  :5226                           ││ ▼               │
-                              └──────────────────────────────────┘│ RabbitMQ ──▶ Java notifier
-                                                                  └── reminder.due ◀─(Spring Boot)
-```
+
+| Service | Folder | Stack | Talks to |
+|---|---|---|---|
+| Web app | `web/` | React 19, TypeScript, Vite | the API only |
+| API | `api/` | ASP.NET Core 10, EF Core 10 | PostgreSQL, Gmail, the matcher (HTTP), RabbitMQ (events) |
+| CV matcher | `matcher/` | Python 3.13, FastAPI | nobody: called by the API |
+| Notifier | `notifier/` | Java 25, Spring Boot 4 | RabbitMQ, its own schema in PostgreSQL |
 
 Key design decisions:
 
@@ -52,6 +54,8 @@ Key design decisions:
 - **Read-only, minimal storage.** OppsView asks Google only for `gmail.readonly`. It stores the sender, subject and the details it extracted, never email bodies. Google's refresh token is encrypted with ASP.NET Core Data Protection.
 - **The CV matcher is a separate, internal service.** It's written in Python (FastAPI) and called only by the .NET API (optionally with a shared key), never by the browser, so login checks and data access stay in one place. Matching uses a skills catalogue (`matcher/src/matcher/skills.toml`) with aliases and implied skills; required skills weigh double, and "X or Y" counts as one requirement met by either. Only the CV's text is stored, not the file.
 - **Event-driven reminders, with a transactional outbox.** Every application change is written as an event to an `OutboxMessages` table **in the same transaction** (an EF Core interceptor, so no code path can forget), then published to RabbitMQ in the background. An event can't be lost if RabbitMQ is down, and can't be sent for a change that was rolled back. The Java notifier keeps its own copy of the data in its own schema, plans reminders, and sends `reminder.due` back. Both sides handle duplicate and out-of-order delivery and use dead-letter queues. Neither service calls the other directly, so each keeps working while the other is down.
+- **Ready for the internet.** Login and register are rate-limited per IP (10 a minute). `/health` and `/health/ready` let the hosting platform check each service. Encryption keys for stored tokens live in the database, so containers can restart freely. Every backend ships as a small, non-root container image.
+- **Continuous integration.** GitHub Actions runs every service's lint, tests and build on each push and pull request (about 470 tests across xUnit, Vitest, pytest and JUnit), checks that EF migrations match the model, and builds the container images.
 - **Tests exercise the real pipeline.** API integration tests boot the real app with `WebApplicationFactory`, running on in-memory SQLite (a real relational database) with a fake clock.
 
 ## Running it locally
@@ -223,7 +227,7 @@ api/         ASP.NET Core API and its tests (see api/README.md)
 web/         React app (see web/README.md)
 matcher/     Python CV matcher (see matcher/README.md)
 notifier/    Java reminders service (see notifier/README.md)
-dashboard/   Phase 5 placeholder
-docs/        screenshots and, later, the architecture diagram
+docs/        screenshots
+.github/     CI workflow (GitHub Actions)
 docker-compose.yml   optional PostgreSQL for Docker users and CI
 ```
