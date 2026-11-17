@@ -1,7 +1,10 @@
 using System.Text;
 using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.ModelBinding.Metadata;
 using Microsoft.EntityFrameworkCore;
@@ -96,7 +99,11 @@ builder.Services.AddScoped<AnalyticsService>();
 builder.Services.AddOptions<GoogleOptions>().BindConfiguration(GoogleOptions.SectionName);
 // Data Protection encrypts the stored Gmail tokens and the OAuth state. Keys
 // live in the user profile locally (%LOCALAPPDATA%\ASP.NET\DataProtection-Keys).
-builder.Services.AddDataProtection().SetApplicationName("OppsView");
+builder.Services.AddDataProtection()
+    .SetApplicationName("OppsView")
+    // Keys in the database, not on disk: containers in the cloud lose their
+    // disk on every restart, which would make stored Gmail tokens unreadable.
+    .PersistKeysToDbContext<AppDbContext>();
 // AddHttpClient<TInterface, TImpl> = a typed HttpClient managed by the
 // framework (pooled connections, no socket exhaustion).
 builder.Services.AddHttpClient<IGoogleOAuthClient, GoogleOAuthClient>();
@@ -164,9 +171,37 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
+// ---- Protection and monitoring --------------------------------------------
+// Login and register are rate-limited per client IP address: enough for a
+// person, too few for a script guessing passwords.
+builder.Services.AddRateLimiter(options =>
+{
+    var perMinute = builder.Configuration.GetValue("RateLimiting:AuthPerMinute", 10);
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy(AuthRateLimit.Policy, http => RateLimitPartition.GetFixedWindowLimiter(
+        http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = perMinute, Window = TimeSpan.FromMinutes(1) }));
+});
+
+// In the cloud the API sits behind a proxy; X-Forwarded-For carries the
+// real client IP (needed for rate limiting per person, not per proxy).
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    // Trust the one proxy in front of us (Azure's ingress); it appends the
+    // address it saw, so take only that last entry.
+    options.ForwardLimit = 1;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
+// /health: the process is up. /health/ready: and it can reach the database.
+builder.Services.AddHealthChecks().AddDbContextCheck<AppDbContext>(tags: ["ready"]);
+
 var app = builder.Build();
 
 // ---- Pipeline (order matters) ------------------------------------------
+app.UseForwardedHeaders();
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 
@@ -177,9 +212,12 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors();
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapHealthChecks("/health", new HealthCheckOptions { Predicate = _ => false }); // liveness: no checks, just "up"
+app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = check => check.Tags.Contains("ready") });
 
 app.Run();
 
