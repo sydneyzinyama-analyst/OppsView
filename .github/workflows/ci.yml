@@ -1,0 +1,100 @@
+# Runs every service's tests on each push and on pull requests into main.
+# One job per service, in parallel, so a failure points straight at the
+# service that broke. Nothing here needs secrets: the tests use in-memory
+# databases (SQLite / H2) and fakes for Google, RabbitMQ and the matcher.
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main]
+
+# A newer push to the same branch cancels the run still in progress.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  api:
+    name: API (.NET)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "10.0.x"
+      - name: Restore
+        run: dotnet restore
+      - name: Build (warnings are errors)
+        run: dotnet build --no-restore -warnaserror
+      - name: Test
+        run: dotnet test --no-build --logger "trx;LogFileName=results.trx"
+      - name: Migrations match the model
+        run: |
+          dotnet tool restore
+          dotnet ef migrations has-pending-model-changes --project src/OppsView.Api --no-build
+
+  web:
+    name: Web (React)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Test
+        run: npm test
+      - name: Type-check and build
+        run: npm run build
+
+  matcher:
+    name: Matcher (Python)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: matcher
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: matcher/pyproject.toml
+      - run: pip install -e ".[dev]"
+      - name: Lint
+        run: |
+          ruff check .
+          ruff format --check .
+      - name: Test
+        run: pytest
+
+  notifier:
+    name: Notifier (Java)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: notifier
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+      - name: Test
+        run: ./mvnw --batch-mode test
