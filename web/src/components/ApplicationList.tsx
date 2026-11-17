@@ -1,9 +1,11 @@
-import { Fragment, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { PLATFORM_LABELS, type Application, type ApplicationStatus, type SaveApplicationRequest } from '../api/types'
-import { formatDate } from '../lib/dates'
+import { avatarTint, initials } from '../lib/avatar'
+import { formatDate, timeAgo } from '../lib/dates'
 import { scoreClass } from '../lib/score'
 import { ApplicationForm } from './ApplicationForm'
+import { MailIcon } from './icons'
 import { SavedMatchView } from './SavedMatchView'
 import { StatusHistory } from './StatusHistory'
 import { StatusSelect } from './StatusSelect'
@@ -28,7 +30,7 @@ export function ApplicationList({ applications, highlightId, onUpdate, onDelete,
   }, [highlightId])
 
   if (applications.length === 0) {
-    return <p className="empty">No applications yet. Add your first one above.</p>
+    return <p className="empty">No applications yet. Click New application to add your first one, or connect Gmail and let OppsView find them.</p>
   }
 
   const toggle = (id: string, view: 'edit' | 'history') =>
@@ -49,123 +51,114 @@ export function ApplicationList({ applications, highlightId, onUpdate, onDelete,
   }
 
   return (
-    <div className="table-wrap">
-      <table className="applications">
-        <thead>
-          <tr>
-            <th>Company</th>
-            <th>Role</th>
-            <th>Platform</th>
-            <th>Applied</th>
-            <th>Status</th>
-            <th>
-              <span className="visually-hidden">Actions</span>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {applications.map((a) => {
-            const isOpen = expanded?.id === a.id
-            return (
-              <Fragment key={a.id}>
-                <tr
-                  id={`application-${a.id}`}
-                  className={[isOpen && 'open', a.id === highlightId && 'highlight'].filter(Boolean).join(' ') || undefined}
-                >
-                  <td data-label="Company">
-                    {a.jobUrl ? (
-                      <a href={a.jobUrl} target="_blank" rel="noreferrer noopener">
-                        {a.company}
-                      </a>
-                    ) : (
-                      a.company
-                    )}
-                    {a.source === 'Email' && (
-                      <span className="source-tag" title="Added automatically from an email">
-                        from email
-                      </span>
-                    )}
-                  </td>
-                  <td data-label="Role">
-                    {a.role}
-                    {a.matchScore !== null && (
-                      <span className={`score-tag ${scoreClass(a.matchScore)}`} title="How well your CV matched this job's ad">
-                        {a.matchScore}% match
-                      </span>
-                    )}
-                  </td>
-                  <td data-label="Platform">{PLATFORM_LABELS[a.platform]}</td>
-                  <td data-label="Applied">{formatDate(a.appliedOn)}</td>
-                  <td data-label="Status">
-                    <StatusSelect
-                      application={a}
-                      disabled={busyId === a.id}
-                      onChange={(s) => withBusy(a.id, () => onChangeStatus(a.id, s))}
-                    />
-                    {a.noReplyDeadline && (
-                      <span className="deadline-tag" title="No reply by this date means unsuccessful (from the employer's email)">
-                        reply by {formatDate(a.noReplyDeadline)}
-                      </span>
-                    )}
-                  </td>
-                  <td className="row-actions">
-                    <button
-                      type="button"
-                      className="link"
-                      aria-expanded={isOpen && expanded.view === 'history'}
-                      onClick={() => toggle(a.id, 'history')}
-                    >
-                      History
-                    </button>
-                    <Link className="link" to={`/match?applicationId=${a.id}`}>
-                      Match CV
-                    </Link>
-                    <button
-                      type="button"
-                      className="link"
-                      aria-expanded={isOpen && expanded.view === 'edit'}
-                      onClick={() => toggle(a.id, 'edit')}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      className="link danger"
-                      disabled={busyId === a.id}
-                      onClick={() => handleDelete(a)}
-                      aria-label={`Delete ${a.company}`}
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-                {isOpen && (
-                  <tr className="detail-row">
-                    <td colSpan={6}>
-                      {expanded.view === 'edit' ? (
-                        <ApplicationForm
-                          initial={a}
-                          onCancel={() => setExpanded(null)}
-                          onSubmit={async (body) => {
-                            await onUpdate(a.id, body)
-                            setExpanded(null)
-                          }}
-                        />
-                      ) : (
-                        <>
-                          {a.notes && <p className="notes">{a.notes}</p>}
-                          <StatusHistory application={a} />
-                          {a.matchScore !== null && <SavedMatchView applicationId={a.id} />}
-                        </>
-                      )}
-                    </td>
-                  </tr>
+    <ul className="app-list">
+      {applications.map((a) => {
+        const isOpen = expanded?.id === a.id
+        return (
+          <li
+            key={a.id}
+            id={`application-${a.id}`}
+            className={['app-item', isOpen && 'open', a.id === highlightId && 'highlight'].filter(Boolean).join(' ')}
+          >
+            <div className="app-row">
+              <span className={`avatar tint-${avatarTint(a.company)}`} aria-hidden="true">
+                {initials(a.company)}
+              </span>
+              <div className="app-main">
+                <div className="app-title">
+                  {a.jobUrl ? (
+                    <a href={a.jobUrl} target="_blank" rel="noreferrer noopener" className="app-company">
+                      {a.company}
+                    </a>
+                  ) : (
+                    <span className="app-company">{a.company}</span>
+                  )}
+                  {a.source === 'Email' && (
+                    <span className="source-tag" title="Added automatically from an email">
+                      <MailIcon width={12} height={12} /> from email
+                    </span>
+                  )}
+                </div>
+                <div className="app-role">
+                  {a.role}
+                  {a.matchScore !== null && (
+                    <span className={`score-tag ${scoreClass(a.matchScore)}`} title="How well your CV matched this job's ad">
+                      {a.matchScore}% match
+                    </span>
+                  )}
+                </div>
+                <div className="app-meta">
+                  <span>{PLATFORM_LABELS[a.platform]}</span>
+                  <span aria-hidden="true">·</span>
+                  <span title={`Applied on ${formatDate(a.appliedOn)}`}>Applied {timeAgo(a.appliedOn)}</span>
+                </div>
+              </div>
+              <div className="app-status">
+                <StatusSelect
+                  application={a}
+                  disabled={busyId === a.id}
+                  onChange={(s) => withBusy(a.id, () => onChangeStatus(a.id, s))}
+                />
+                {a.noReplyDeadline && (
+                  <span className="deadline-tag" title="No reply by this date means unsuccessful (from the employer's email)">
+                    reply by {formatDate(a.noReplyDeadline)}
+                  </span>
                 )}
-              </Fragment>
-            )
-          })}
-        </tbody>
-      </table>
-    </div>
+              </div>
+              <div className="app-actions">
+                <button
+                  type="button"
+                  className="ghost"
+                  aria-expanded={isOpen && expanded.view === 'history'}
+                  onClick={() => toggle(a.id, 'history')}
+                >
+                  History
+                </button>
+                <Link className="ghost" to={`/match?applicationId=${a.id}`}>
+                  Match CV
+                </Link>
+                <button
+                  type="button"
+                  className="ghost"
+                  aria-expanded={isOpen && expanded.view === 'edit'}
+                  onClick={() => toggle(a.id, 'edit')}
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  className="ghost danger"
+                  disabled={busyId === a.id}
+                  onClick={() => handleDelete(a)}
+                  aria-label={`Delete ${a.company}`}
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+            {isOpen && (
+              <div className="app-detail">
+                {expanded.view === 'edit' ? (
+                  <ApplicationForm
+                    initial={a}
+                    onCancel={() => setExpanded(null)}
+                    onSubmit={async (body) => {
+                      await onUpdate(a.id, body)
+                      setExpanded(null)
+                    }}
+                  />
+                ) : (
+                  <>
+                    {a.notes && <p className="notes">{a.notes}</p>}
+                    <StatusHistory application={a} />
+                    {a.matchScore !== null && <SavedMatchView applicationId={a.id} />}
+                  </>
+                )}
+              </div>
+            )}
+          </li>
+        )
+      })}
+    </ul>
   )
 }

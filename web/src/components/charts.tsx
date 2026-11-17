@@ -89,9 +89,9 @@ export function ColumnChart({ title, tableHeadings, items, empty = 'Nothing to s
 }
 
 /** A headline number. */
-export function StatTile({ label, value, hint }: { label: string; value: string; hint?: string }) {
+export function StatTile({ label, value, hint, tone }: { label: string; value: string; hint?: string; tone?: string }) {
   return (
-    <div className="stat-tile">
+    <div className={tone ? `stat-tile tone-${tone}` : 'stat-tile'}>
       <span className="stat-value">{value}</span>
       <span className="stat-label">{label}</span>
       {hint && <span className="muted small">{hint}</span>}

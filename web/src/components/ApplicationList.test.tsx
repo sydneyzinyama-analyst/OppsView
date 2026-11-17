@@ -56,7 +56,7 @@ describe('ApplicationList', () => {
 
   it('highlights the application a reminder linked to', () => {
     renderList({ highlightId: 'a2' })
-    expect(screen.getByRole('link', { name: 'Globex' }).closest('tr')).toHaveClass('highlight')
+    expect(screen.getByRole('link', { name: 'Globex' }).closest('li')).toHaveClass('highlight')
   })
 
   it('labels applications that came from email', () => {

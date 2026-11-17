@@ -25,3 +25,17 @@ export function formatDateTime(isoTimestamp: string): string {
     minute: '2-digit',
   })
 }
+
+/** "2026-11-10" -> "today", "yesterday", "5 days ago", "3 weeks ago", "2 months ago". */
+export function timeAgo(isoDate: string, now: Date = new Date()): string {
+  const [y, m, d] = isoDate.split('-').map(Number)
+  const then = new Date(y, m - 1, d)
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const days = Math.round((today.getTime() - then.getTime()) / 86_400_000)
+  if (days <= 0) return 'today'
+  if (days === 1) return 'yesterday'
+  if (days < 14) return `${days} days ago`
+  if (days < 60) return `${Math.floor(days / 7)} weeks ago`
+  const months = Math.floor(days / 30)
+  return months < 12 ? `${months} months ago` : `${Math.floor(days / 365)} year${days < 730 ? '' : 's'} ago`
+}

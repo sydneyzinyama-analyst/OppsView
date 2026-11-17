@@ -6,6 +6,7 @@ import { getCv, matchCv } from '../api/matching'
 import type { Application, Cv, MatchResult } from '../api/types'
 import { CvPanel } from '../components/CvPanel'
 import { MatchResultView } from '../components/MatchResultView'
+import { PageHeader } from '../components/PageHeader'
 
 /** Upload a CV, paste a job ad, see how well they match. */
 export function MatchPage() {
@@ -56,6 +57,7 @@ export function MatchPage() {
 
   return (
     <main className="container">
+        <PageHeader title="CV match" subtitle="Paste a job ad and see how well your CV fits, and which skills to add." />
       <section className="card">
         <h2>Your CV</h2>
         {cv === undefined ? <p className="muted">Loading…</p> : <CvPanel cv={cv} onChanged={setCv} />}

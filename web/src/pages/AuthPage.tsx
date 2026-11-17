@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { ApiError, type FieldErrors } from '../api/client'
 import { useAuth } from '../auth/useAuth'
+import { BellIcon, ChartIcon, LogoMark, MailIcon, SparkleIcon } from '../components/icons'
 
 interface Props {
   mode: 'login' | 'register'
@@ -61,10 +62,34 @@ export function AuthPage({ mode }: Props) {
 
   return (
     <main className="auth-page">
+      <section className="auth-hero">
+        <div className="auth-logo">
+          <LogoMark size={40} />
+          <h1 className="brand">OppsView</h1>
+        </div>
+        <p className="auth-tagline">Every email is an opportunity.</p>
+        <ul className="auth-features">
+          <li>
+            <MailIcon /> Reads your job emails and fills in your applications for you
+          </li>
+          <li>
+            <SparkleIcon /> Scores your CV against a job ad and shows the skills you're missing
+          </li>
+          <li>
+            <BellIcon /> Reminds you to follow up when a company goes quiet
+          </li>
+          <li>
+            <ChartIcon /> Shows which job sites reply and where applications stall
+          </li>
+        </ul>
+      </section>
+
+      <div className="auth-form-side">
       <div className="card auth-card">
-        <h1 className="brand">OppsView</h1>
-        <p className="tagline">Every email is an opportunity.</p>
         <h2>{isRegister ? 'Create your account' : 'Sign in'}</h2>
+        <p className="muted auth-intro">
+          {isRegister ? 'Start tracking your job hunt in under a minute.' : 'Welcome back. Pick up where you left off.'}
+        </p>
 
         <form onSubmit={handleSubmit} noValidate>
           {formError && (
@@ -125,6 +150,7 @@ export function AuthPage({ mode }: Props) {
             </>
           )}
         </p>
+      </div>
       </div>
     </main>
   )
