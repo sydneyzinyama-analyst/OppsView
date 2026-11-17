@@ -3,6 +3,7 @@ import { disconnectGmail, startGmailConnect, syncEmail } from '../api/email'
 import type { EmailStatus } from '../api/types'
 import { formatDateTime } from '../lib/dates'
 import { describeSync } from '../lib/email'
+import { MailIcon } from './icons'
 
 interface Props {
   status: EmailStatus
@@ -10,10 +11,12 @@ interface Props {
   onChanged: () => void
   /** Sends the browser to Google; replaceable in tests. */
   navigate?: (url: string) => void
+  /** The short version for the ledger's margin. */
+  compact?: boolean
 }
 
 /** "Connect Gmail" / "Sync now": OppsView filling itself in from your inbox. */
-export function EmailPanel({ status, onChanged, navigate = (url) => window.location.assign(url) }: Props) {
+export function EmailPanel({ status, onChanged, navigate = (url) => window.location.assign(url), compact = false }: Props) {
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null)
 
@@ -49,6 +52,29 @@ export function EmailPanel({ status, onChanged, navigate = (url) => window.locat
       await disconnectGmail()
       onChanged()
     })
+  }
+
+  if (compact && (!status.available || !status.connected)) {
+    return (
+      <div className="email-compact">
+        <MailIcon />
+        <p>
+          {status.available
+            ? 'Connect Gmail to file replies automatically.'
+            : 'Email import isn’t set up on this server yet (see the README).'}
+        </p>
+        {status.available && (
+          <button type="button" className="link accent-link" onClick={connect} disabled={busy}>
+            Connect
+          </button>
+        )}
+        {message && (
+          <p className="alert" role="status">
+            {message.text}
+          </p>
+        )}
+      </div>
+    )
   }
 
   if (!status.available) {

@@ -5,6 +5,8 @@ interface Props {
   application: Application
   disabled?: boolean
   onChange: (status: ApplicationStatus) => void
+  /** Words to show for each status (the ledger says "Sent" for Applied). */
+  labels?: Partial<Record<ApplicationStatus, string>>
 }
 
 /**
@@ -12,9 +14,9 @@ interface Props {
  * so the transition rules live in one place: the API. A final status
  * (Offer, Rejected) has no moves left and is shown as a plain badge.
  */
-export function StatusSelect({ application, disabled, onChange }: Props) {
+export function StatusSelect({ application, disabled, onChange, labels = {} }: Props) {
   const { status, allowedNextStatuses: next } = application
-  if (next.length === 0) return <StatusBadge status={status} />
+  if (next.length === 0) return <StatusBadge status={status} label={labels[status]} />
 
   return (
     <select
@@ -24,10 +26,10 @@ export function StatusSelect({ application, disabled, onChange }: Props) {
       disabled={disabled}
       onChange={(e) => onChange(e.target.value as ApplicationStatus)}
     >
-      <option value={status}>{status}</option>
+      <option value={status}>{labels[status] ?? status}</option>
       {next.map((s) => (
         <option key={s} value={s}>
-          → {s}
+          → {labels[s] ?? s}
         </option>
       ))}
     </select>

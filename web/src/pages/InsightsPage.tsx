@@ -3,6 +3,14 @@ import { Link } from 'react-router-dom'
 import { getAnalytics, type Analytics } from '../api/analytics'
 import { PLATFORM_LABELS } from '../api/types'
 import { BarList, ColumnChart, StatTile } from '../components/charts'
+import { PageHeader } from '../components/PageHeader'
+
+const header = (
+  <PageHeader
+    title="Insights"
+    subtitle="How your job hunt is going: who replies, where applications stall, what to learn next."
+  />
+)
 
 const percent = (share: number) => `${Math.round(share * 100)}%`
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
@@ -33,6 +41,7 @@ export function InsightsPage() {
   if (error)
     return (
       <main className="container">
+        {header}
         <p className="alert" role="alert">
           {error}
         </p>
@@ -41,6 +50,7 @@ export function InsightsPage() {
   if (!data)
     return (
       <main className="container">
+        {header}
         <p className="muted">Loading…</p>
       </main>
     )
@@ -49,8 +59,8 @@ export function InsightsPage() {
   if (totals.applications === 0)
     return (
       <main className="container">
+        {header}
         <section className="card">
-          <h2>Insights</h2>
           <p className="empty">
             No applications yet. <Link to="/">Add one</Link> or connect Gmail, and your numbers will appear here.
           </p>
@@ -62,6 +72,7 @@ export function InsightsPage() {
 
   return (
     <main className="container insights">
+        {header}
       <section className="stat-row" aria-label="Summary">
         <StatTile label="Applications" value={String(totals.applications)} hint={`${totals.active} still open`} />
         <StatTile label="Response rate" value={percent(totals.responseRate)} hint="got an interview, offer or rejection" />

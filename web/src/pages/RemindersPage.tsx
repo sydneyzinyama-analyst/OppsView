@@ -5,6 +5,7 @@ import type { Reminder, ReminderKind, ReminderSettings } from '../api/types'
 import { useRefreshBell } from '../components/bell'
 import { ReminderSettingsForm } from '../components/ReminderSettingsForm'
 import { formatDate } from '../lib/dates'
+import { PageHeader } from '../components/PageHeader'
 
 const KIND_LABELS: Record<ReminderKind, string> = {
   FOLLOW_UP: 'Follow up',
@@ -48,9 +49,10 @@ export function RemindersPage() {
 
   return (
     <main className="container">
+        <PageHeader title="Reminders" subtitle="Nudges to follow up when a company has gone quiet." />
       <section className="card">
         <h2>
-          Reminders {reminders && reminders.length > 0 && <span className="count">{reminders.length}</span>}
+          Waiting for you {reminders && reminders.length > 0 && <span className="count">{reminders.length}</span>}
         </h2>
         {error && (
           <p className="alert" role="alert">

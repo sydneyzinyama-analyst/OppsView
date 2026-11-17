@@ -5,7 +5,7 @@ import { countReminders } from '../api/reminders'
 /** How often the bell checks for new reminders. The notifier sends them at most once a minute. */
 export const BELL_REFRESH_MS = 60_000
 
-/** The bell in the top bar: a link to the reminders page with the number waiting. */
+/** The Reminders menu item: a link to the reminders page and the number waiting. */
 export function ReminderBell({ refreshKey = 0 }: { refreshKey?: number }) {
   const [count, setCount] = useState(0)
 
@@ -27,7 +27,7 @@ export function ReminderBell({ refreshKey = 0 }: { refreshKey?: number }) {
   const label = count === 0 ? 'Reminders' : `Reminders, ${count} waiting`
   return (
     <NavLink to="/reminders" className="bell" aria-label={label} title={label}>
-      <span aria-hidden="true">🔔</span>
+      <span aria-hidden="true">Reminders</span>
       {count > 0 && (
         <span className="bell-count" aria-hidden="true">
           {count > 9 ? '9+' : count}

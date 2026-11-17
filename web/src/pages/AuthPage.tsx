@@ -61,10 +61,27 @@ export function AuthPage({ mode }: Props) {
 
   return (
     <main className="auth-page">
+      <section className="auth-hero">
+        <h1 className="logo logo-large">
+          Opps<em>View</em>
+        </h1>
+        <p className="auth-tagline">
+          Every email is an <em>opportunity.</em>
+        </p>
+        <ol className="auth-features">
+          <li>Reads your job emails and fills in the ledger for you.</li>
+          <li>Scores your CV against a job ad and names the skills you're missing.</li>
+          <li>Reminds you to follow up when a company goes quiet.</li>
+          <li>Shows which job sites reply, and where applications stall.</li>
+        </ol>
+      </section>
+
+      <div className="auth-form-side">
       <div className="card auth-card">
-        <h1 className="brand">OppsView</h1>
-        <p className="tagline">Every email is an opportunity.</p>
         <h2>{isRegister ? 'Create your account' : 'Sign in'}</h2>
+        <p className="muted auth-intro">
+          {isRegister ? 'Start tracking your job hunt in under a minute.' : 'Welcome back. Pick up where you left off.'}
+        </p>
 
         <form onSubmit={handleSubmit} noValidate>
           {formError && (
@@ -125,6 +142,7 @@ export function AuthPage({ mode }: Props) {
             </>
           )}
         </p>
+      </div>
       </div>
     </main>
   )
