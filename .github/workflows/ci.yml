@@ -37,6 +37,10 @@ jobs:
       - name: Test
         run: dotnet test --no-build --logger "trx;LogFileName=results.trx"
       - name: Migrations match the model
+        env:
+          # The EF tool builds the app to read its model, and the app requires a
+          # connection string. This check never connects, so a dummy one is fine.
+          ConnectionStrings__Default: "Host=localhost;Database=unused"
         run: |
           dotnet tool restore
           dotnet ef migrations has-pending-model-changes --project src/OppsView.Api --no-build
@@ -98,3 +102,19 @@ jobs:
           cache: maven
       - name: Test
         run: ./mvnw --batch-mode test
+
+  images:
+    name: Container image (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    # Only build images once the tests pass.
+    needs: [api, matcher, notifier]
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [api, matcher, notifier]
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build (not pushed yet; deployment pushes)
+        run: docker build --tag oppsview-${{ matrix.service }}:ci ${{ matrix.service }}
+      - name: Image size
+        run: docker image ls oppsview-${{ matrix.service }}:ci --format "{{.Repository}}:{{.Tag}} {{.Size}}"
