@@ -211,6 +211,15 @@ Reminders then appear under the 🔔. Without RabbitMQ everything else works, an
 
 ### Day-to-day
 
+One command from the repository root opens each service in its own window, then the website:
+
+```powershell
+.\start.ps1          # API + website
+.\start.ps1 -All     # + matcher and notifier (or pick: -Matcher, -Notifier)
+```
+
+Or start them by hand:
+
 | Window | Folder | Command | Needed for |
 |---|---|---|---|
 | API | `api` | `dotnet run --project src/OppsView.Api` | everything |
