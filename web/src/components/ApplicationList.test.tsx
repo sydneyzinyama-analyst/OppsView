@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 import * as api from '../api/applications'
+import * as matchApi from '../api/matching'
 import { makeApplication } from '../test/fixtures'
 import { ApplicationList } from './ApplicationList'
 
@@ -33,7 +34,7 @@ describe('ApplicationList', () => {
     renderList({ applications: [makeApplication({ noReplyDeadline: '2026-11-26' })] })
 
     expect(screen.getByText(/reply by/)).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: 'History' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Details for Acme' }))
     expect(await screen.findByText(/OppsView will mark this Rejected/)).toBeInTheDocument()
   })
 
@@ -43,20 +44,23 @@ describe('ApplicationList', () => {
     ])
     renderList({ applications: [makeApplication()] })
 
-    await userEvent.click(screen.getByRole('button', { name: 'History' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Details for Acme' }))
     expect(await screen.findByText(/no reply by the deadline/)).toBeInTheDocument()
   })
 
-  it('shows the CV match score and links to matching', () => {
+  it('shows the CV match score and links to matching', async () => {
+    vi.spyOn(api, 'getHistory').mockResolvedValue([])
+    vi.spyOn(matchApi, 'getSavedMatch').mockResolvedValue(null)
     renderList({ applications: [makeApplication({ id: 'a9', matchScore: 42 })] })
 
     expect(screen.getByText('42% match')).toHaveClass('score-low')
+    await userEvent.click(screen.getByRole('button', { name: 'Details for Acme' }))
     expect(screen.getByRole('link', { name: 'Match CV' })).toHaveAttribute('href', '/match?applicationId=a9')
   })
 
   it('highlights the application a reminder linked to', () => {
     renderList({ highlightId: 'a2' })
-    expect(screen.getByRole('link', { name: 'Globex' }).closest('li')).toHaveClass('highlight')
+    expect(screen.getByRole('link', { name: 'Globex' }).closest('tr')).toHaveClass('highlight')
   })
 
   it('labels applications that came from email', () => {
@@ -72,7 +76,9 @@ describe('ApplicationList', () => {
 
   it('deletes only after confirmation', async () => {
     const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
+    vi.spyOn(api, 'getHistory').mockResolvedValue([])
     const { onDelete } = renderList()
+    await userEvent.click(screen.getByRole('button', { name: 'Details for Acme' }))
 
     await userEvent.click(screen.getByRole('button', { name: 'Delete Acme' }))
     expect(onDelete).not.toHaveBeenCalled()
@@ -82,6 +88,19 @@ describe('ApplicationList', () => {
     expect(confirm).toHaveBeenCalledTimes(2)
   })
 
+  it('numbers entries, shows progress and ledger stamps', () => {
+    renderList({
+      applications: [
+        makeApplication({ id: 'a1', createdAt: '2026-11-01T00:00:00Z', status: 'Interview', allowedNextStatuses: ['Offer'] }),
+        makeApplication({ id: 'a2', company: 'Globex', createdAt: '2026-10-01T00:00:00Z', status: 'Rejected', allowedNextStatuses: [] }),
+      ],
+    })
+    expect(screen.getByText('002')).toBeInTheDocument()
+    expect(screen.getByText('001')).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: '3 of 4 steps: Interview' })).toBeInTheDocument()
+    expect(screen.getByText('Declined')).toBeInTheDocument()
+  })
+
   it('changes status from the dropdown', async () => {
     const { onChangeStatus } = renderList()
     await userEvent.selectOptions(screen.getByLabelText('Status for Globex'), 'Rejected')
@@ -89,8 +108,10 @@ describe('ApplicationList', () => {
   })
 
   it('opens an edit form and saves through onUpdate', async () => {
+    vi.spyOn(api, 'getHistory').mockResolvedValue([])
     const { onUpdate } = renderList()
-    await userEvent.click(screen.getAllByRole('button', { name: 'Edit' })[0])
+    await userEvent.click(screen.getByRole('button', { name: 'Details for Acme' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Edit' }))
 
     const role = screen.getByLabelText('Role')
     await userEvent.clear(role)
@@ -107,7 +128,7 @@ describe('ApplicationList', () => {
     ])
     renderList()
 
-    await userEvent.click(screen.getAllByRole('button', { name: 'History' })[0])
+    await userEvent.click(screen.getByRole('button', { name: 'Details for Acme' }))
 
     const timeline = await screen.findByRole('list', { name: 'Status history for Acme' })
     expect(timeline).toHaveTextContent('Interview')

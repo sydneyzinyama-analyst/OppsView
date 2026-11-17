@@ -2,7 +2,6 @@ import { useState, type FormEvent } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { ApiError, type FieldErrors } from '../api/client'
 import { useAuth } from '../auth/useAuth'
-import { BellIcon, ChartIcon, LogoMark, MailIcon, SparkleIcon } from '../components/icons'
 
 interface Props {
   mode: 'login' | 'register'
@@ -63,25 +62,18 @@ export function AuthPage({ mode }: Props) {
   return (
     <main className="auth-page">
       <section className="auth-hero">
-        <div className="auth-logo">
-          <LogoMark size={40} />
-          <h1 className="brand">OppsView</h1>
-        </div>
-        <p className="auth-tagline">Every email is an opportunity.</p>
-        <ul className="auth-features">
-          <li>
-            <MailIcon /> Reads your job emails and fills in your applications for you
-          </li>
-          <li>
-            <SparkleIcon /> Scores your CV against a job ad and shows the skills you're missing
-          </li>
-          <li>
-            <BellIcon /> Reminds you to follow up when a company goes quiet
-          </li>
-          <li>
-            <ChartIcon /> Shows which job sites reply and where applications stall
-          </li>
-        </ul>
+        <h1 className="logo logo-large">
+          Opps<em>View</em>
+        </h1>
+        <p className="auth-tagline">
+          Every email is an <em>opportunity.</em>
+        </p>
+        <ol className="auth-features">
+          <li>Reads your job emails and fills in the ledger for you.</li>
+          <li>Scores your CV against a job ad and names the skills you're missing.</li>
+          <li>Reminds you to follow up when a company goes quiet.</li>
+          <li>Shows which job sites reply, and where applications stall.</li>
+        </ol>
       </section>
 
       <div className="auth-form-side">

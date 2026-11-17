@@ -14,3 +14,11 @@ export function avatarTint(name: string): number {
   for (const ch of name.trim().toLowerCase()) hash = (hash * 31 + ch.charCodeAt(0)) | 0
   return Math.abs(hash) % AVATAR_TINTS
 }
+
+/** "sydney.zinyama@…" -> "SZ"; "me@example.com" -> "ME". */
+export function userInitials(email: string): string {
+  const name = email.split('@')[0] ?? ''
+  const parts = name.split(/[._\-+]+/).filter(Boolean)
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
+  return name.slice(0, 2).toUpperCase() || '?'
+}

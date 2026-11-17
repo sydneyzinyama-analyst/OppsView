@@ -8,7 +8,7 @@ Job hunting means sending dozens of applications across Pnet, Indeed, LinkedIn, 
 
 Every application moves through the pipeline (Applied, Viewed, Interview, Offer, Rejected) with a full history of every status change. A CV matcher scores your CV against a job ad and lists the skills you're missing. Follow-up reminders nudge you when a company goes quiet. An Insights page shows your applications per week, response rate by platform, where applications stall, and the skills you're most often missing.
 
-![OppsView: your applications with search, status filters and your numbers at a glance](docs/screenshot-applications.png)
+![OppsView: the ledger. Your week in a headline, every application numbered with its progress, and notes in the margins](docs/screenshot-applications.png)
 
 This repository is a portfolio project, built in phases. Each phase adds a service in a different stack.
 

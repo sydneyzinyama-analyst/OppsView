@@ -1,65 +1,61 @@
 import { useEffect, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import * as api from '../api/applications'
 import { getEmailStatus, listReviewItems } from '../api/email'
-import { STATUSES, type Application, type ApplicationStatus, type EmailStatus, type ReviewItem, type SaveApplicationRequest } from '../api/types'
+import type { Application, ApplicationStatus, EmailStatus, ReviewItem, SaveApplicationRequest } from '../api/types'
 import { ApplicationForm } from '../components/ApplicationForm'
 import { ApplicationList } from '../components/ApplicationList'
 import { EmailPanel } from '../components/EmailPanel'
+import { Modal } from '../components/Modal'
 import { ReviewList } from '../components/ReviewList'
 import { CONNECT_RESULTS } from '../lib/email'
-import { StatTile } from '../components/charts'
-import { MailIcon, PlusIcon, SearchIcon } from '../components/icons'
-import { Modal } from '../components/Modal'
-import { PageHeader } from '../components/PageHeader'
+import { dateline, entryNumbers, headline, marginNotes, summary, tally } from '../lib/ledger'
 
-type Filter = 'All' | ApplicationStatus
+type Filter = 'All' | 'Open' | 'Closed'
 
-function countByStatus(list: Application[]): Record<ApplicationStatus, number> {
-  const counts = { Applied: 0, Viewed: 0, Interview: 0, Offer: 0, Rejected: 0 }
-  for (const a of list) counts[a.status]++
-  return counts
-}
+/** Closed = turned down; everything else (offers included) is still open. */
+const isClosed = (a: Application) => a.status === 'Rejected'
 
 function filterApplications(list: Application[], filter: Filter, query: string): Application[] {
   const q = query.trim().toLowerCase()
   return list.filter(
     (a) =>
-      (filter === 'All' || a.status === filter) &&
+      (filter === 'All' || (filter === 'Closed') === isClosed(a)) &&
       (!q || a.company.toLowerCase().includes(q) || a.role.toLowerCase().includes(q)),
   )
 }
 
-function greeting(now = new Date()): string {
-  const h = now.getHours()
-  return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'
-}
-
 /**
- * Owns the list state. Child components call back with intent ("delete this")
- * and this page talks to the API and swaps in the server's response, so the
- * screen always shows what the server actually saved.
+ * The ledger (home page). Owns the list state: child components call back
+ * with intent ("delete this") and this page talks to the API and swaps in
+ * the server's response, so the screen always shows what the server saved.
  */
 export function ApplicationsPage() {
   const [applications, setApplications] = useState<Application[] | null>(null)
   const [error, setError] = useState<string | null>(null)
-
   const [emailStatus, setEmailStatus] = useState<EmailStatus | null>(null)
   const [reviewItems, setReviewItems] = useState<ReviewItem[]>([])
-
-  const [adding, setAdding] = useState(false)
   const [filter, setFilter] = useState<Filter>('All')
-  const [query, setQuery] = useState('')
 
-  // Google sends the browser back to /?gmail=connected (or an error code).
-  // Read it once for the banner, then tidy the URL.
+  // The address carries one-off signals: ?gmail=… (back from Google),
+  // ?highlight=<id> (a reminder's link) and ?new=1 (the "New entry" button).
+  // Read them once, then tidy the URL. ?q= (search) stays: it's the search box's value.
   const [searchParams, setSearchParams] = useSearchParams()
   const [connectResult] = useState(() => CONNECT_RESULTS[searchParams.get('gmail') ?? ''] ?? null)
-  // A reminder's "View application" link: /?highlight=<id>.
   const [highlightId] = useState(() => searchParams.get('highlight'))
+  const [adding, setAdding] = useState(false)
+  const query = searchParams.get('q') ?? ''
+  const wantsNew = searchParams.get('new') === '1'
+  // "New entry" pressed: open the window (adjusting state while rendering,
+  // React's pattern for state that follows a changed input).
+  if (wantsNew && !adding) setAdding(true)
   useEffect(() => {
-    if (searchParams.has('gmail') || searchParams.has('highlight')) setSearchParams({}, { replace: true })
-  }, [searchParams, setSearchParams])
+    if (searchParams.has('gmail') || searchParams.has('highlight') || wantsNew) {
+      const keep = new URLSearchParams()
+      if (searchParams.get('q')) keep.set('q', searchParams.get('q')!)
+      setSearchParams(keep, { replace: true })
+    }
+  }, [searchParams, setSearchParams, wantsNew])
 
   // Bumping this reloads everything (Retry button, after a sync or review).
   const [reloadKey, setReloadKey] = useState(0)
@@ -123,125 +119,141 @@ export function ApplicationsPage() {
     }
   }
 
-  const counts = countByStatus(applications ?? [])
-  const waiting = counts.Applied + counts.Viewed
-  const shown = filterApplications(applications ?? [], filter, query)
+  const all = applications ?? []
+  const t = tally(all)
+  const [line1, line2] = headline(t)
+  const shown = filterApplications(all, filter, query)
+  const notes = marginNotes(all)
+  const closed = all.filter(isClosed).length
+  const offerShare = t.sent ? Math.round((t.offers / t.sent) * 100) : 0
 
   return (
-    <main className="container">
-      <PageHeader
-        title={`${greeting()} 👋`}
-        subtitle={
-          applications === null
-            ? 'Here’s how your job hunt is going.'
-            : waiting === 0
-              ? 'Nothing waiting on a reply right now.'
-              : `${waiting} application${waiting === 1 ? ' is' : 's are'} waiting to hear back. Every email is an opportunity.`
-        }
-        actions={
-          <button type="button" className="primary" onClick={() => setAdding(true)}>
-            <PlusIcon /> New application
-          </button>
-        }
-      />
-
-      {connectResult && (
-        <p className={connectResult.ok ? 'notice' : 'alert'} role="status">
-          {connectResult.text}
-        </p>
-      )}
-
-      {applications && applications.length > 0 && (
-        <section className="stat-row" aria-label="Your numbers">
-          <StatTile label="Applications" value={String(applications.length)} hint="in total" tone="brand" />
-          <StatTile label="Waiting" value={String(waiting)} hint="applied or viewed" tone="viewed" />
-          <StatTile label="Interviews" value={String(counts.Interview)} hint="in progress" tone="interview" />
-          <StatTile label="Offers" value={String(counts.Offer)} hint={counts.Offer > 0 ? 'well done!' : 'keep going'} tone="offer" />
+    <main className="container ledger-page">
+      <div className="ledger-main">
+        <section className="hero" aria-label="Your week">
+          <p className="dateline mono">{dateline()}</p>
+          <h1 className="hero-title">
+            {line1}
+            <br />
+            <em>{line2}</em>
+          </h1>
+          <p className="hero-lede">{applications ? summary(all) : 'Opening the ledger…'}</p>
         </section>
-      )}
 
-      {emailStatus && (
-        <section className="card email-card">
-          <div className="card-icon" aria-hidden="true">
-            <MailIcon />
-          </div>
-          <div className="email-card-body">
-            <h2>Email import</h2>
-            <EmailPanel status={emailStatus} onChanged={reload} />
-          </div>
-        </section>
-      )}
-
-      {reviewItems.length > 0 && (
-        <section className="card">
-          <h2>
-            Needs review <span className="count">{reviewItems.length}</span>
-          </h2>
-          <p className="muted">OppsView wasn't sure about these emails. Add them as applications or ignore them.</p>
-          <ReviewList items={reviewItems} onResolved={reload} />
-        </section>
-      )}
-
-      <section className="card list-card">
-        <div className="list-head">
-          <h2>
-            Your applications {applications && <span className="count">{applications.length}</span>}
-          </h2>
-          {applications && applications.length > 0 && (
-            <label className="search">
-              <SearchIcon />
-              <span className="visually-hidden">Search applications</span>
-              <input
-                type="search"
-                placeholder="Search company or role"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-              />
-            </label>
-          )}
-        </div>
-
-        {applications && applications.length > 0 && (
-          <div className="filters" role="group" aria-label="Show applications by status">
-            {(['All', ...STATUSES] as const).map((f) => (
-              <button
-                key={f}
-                type="button"
-                className={`filter${f !== 'All' ? ` filter-${f.toLowerCase()}` : ''}`}
-                aria-pressed={filter === f}
-                onClick={() => setFilter(f)}
-              >
-                {f} <span className="filter-count">{f === 'All' ? applications.length : counts[f]}</span>
-              </button>
-            ))}
-          </div>
-        )}
-
-        {error && (
-          <p className="alert" role="alert">
-            {error}{' '}
-            <button type="button" className="link" onClick={reload}>
-              Retry
-            </button>
+        {connectResult && (
+          <p className={connectResult.ok ? 'notice' : 'alert'} role="status">
+            {connectResult.text}
           </p>
         )}
-        {applications === null ? (
-          !error && <p className="muted">Loading…</p>
-        ) : applications.length > 0 && shown.length === 0 ? (
-          <p className="empty">No applications match. Try another search or filter.</p>
-        ) : (
-          <ApplicationList
-            applications={shown}
-            highlightId={highlightId}
-            onUpdate={handleUpdate}
-            onDelete={handleDelete}
-            onChangeStatus={handleChangeStatus}
-          />
+
+        <section className="tally" aria-label="Your numbers">
+          <div className="tally-item">
+            <span className="tally-value">{t.sent}</span>
+            <span className="tally-label">Sent</span>
+          </div>
+          <div className="tally-item">
+            <span className="tally-value">{t.awaiting}</span>
+            <span className="tally-label">Awaiting word</span>
+          </div>
+          <div className="tally-item">
+            <span className="tally-value">{t.interviews}</span>
+            <span className="tally-label">{t.interviews === 1 ? 'Interview' : 'Interviews'}</span>
+          </div>
+          <div className="tally-item tally-accent">
+            <span className="tally-value">{t.offers}</span>
+            <span className="tally-label">
+              {t.offers === 1 ? 'Offer' : 'Offers'} · {offerShare}% of sent
+            </span>
+          </div>
+        </section>
+
+        <section className="ledger-section" aria-labelledby="applications-heading">
+          <div className="section-head">
+            <h2 id="applications-heading" className="section-title">
+              Applications
+            </h2>
+            {all.length > 0 && (
+              <div className="pills" role="group" aria-label="Show applications">
+                {(
+                  [
+                    ['All', all.length],
+                    ['Open', all.length - closed],
+                    ['Closed', closed],
+                  ] as const
+                ).map(([f, n]) => (
+                  <button key={f} type="button" className="pill" aria-pressed={filter === f} onClick={() => setFilter(f)}>
+                    {f} {n}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          {query && (
+            <p className="muted search-note">
+              Showing matches for “{query}”. <Link to="/">Clear search</Link>
+            </p>
+          )}
+          {error && (
+            <p className="alert" role="alert">
+              {error}{' '}
+              <button type="button" className="link" onClick={reload}>
+                Retry
+              </button>
+            </p>
+          )}
+          {applications === null ? (
+            !error && <p className="muted">Loading…</p>
+          ) : all.length > 0 && shown.length === 0 ? (
+            <p className="empty">No applications match. Try another search or filter.</p>
+          ) : (
+            <ApplicationList
+              applications={shown}
+              numbers={entryNumbers(all)}
+              highlightId={highlightId}
+              onUpdate={handleUpdate}
+              onDelete={handleDelete}
+              onChangeStatus={handleChangeStatus}
+            />
+          )}
+        </section>
+
+        {reviewItems.length > 0 && (
+          <section className="ledger-section" aria-labelledby="review-heading">
+            <h2 id="review-heading" className="section-title">
+              Needs a look <span className="count">{reviewItems.length}</span>
+            </h2>
+            <p className="muted">OppsView wasn't sure about these emails. Add them as applications or ignore them.</p>
+            <ReviewList items={reviewItems} onResolved={reload} />
+          </section>
         )}
-      </section>
+      </div>
+
+      <aside className="margins" aria-labelledby="margins-heading">
+        <h2 id="margins-heading" className="margins-title">
+          In the margins
+        </h2>
+        {notes.length === 0 && applications && (
+          <p className="muted margin-empty">Nothing needs you right now. Notes about offers, interviews and quiet companies appear here.</p>
+        )}
+        {notes.map((n) => (
+          <Link key={n.key} to={n.to} className={`margin-note note-${n.tone}`}>
+            <span className="note-kicker mono">{n.kicker}</span>
+            <span className="note-title">{n.title}</span>
+            <span className="note-body">{n.body}</span>
+            <span className="note-arrow" aria-hidden="true">
+              ↗
+            </span>
+          </Link>
+        ))}
+        {emailStatus && (
+          <div className="margin-email">
+            <EmailPanel status={emailStatus} onChanged={reload} compact />
+          </div>
+        )}
+      </aside>
 
       {adding && (
-        <Modal title="New application" onClose={() => setAdding(false)}>
+        <Modal title="New entry" onClose={() => setAdding(false)}>
           <ApplicationForm
             onCancel={() => setAdding(false)}
             onSubmit={async (body) => {
