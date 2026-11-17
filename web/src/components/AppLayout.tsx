@@ -19,6 +19,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
             <NavLink to="/" end>
               Applications
             </NavLink>
+            <NavLink to="/insights">Insights</NavLink>
             <NavLink to="/match">CV match</NavLink>
           </nav>
         </div>

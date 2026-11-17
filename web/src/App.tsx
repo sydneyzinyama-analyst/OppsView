@@ -3,6 +3,7 @@ import { RequireAuth } from './auth/RequireAuth'
 import { AppLayout } from './components/AppLayout'
 import { ApplicationsPage } from './pages/ApplicationsPage'
 import { AuthPage } from './pages/AuthPage'
+import { InsightsPage } from './pages/InsightsPage'
 import { MatchPage } from './pages/MatchPage'
 import { RemindersPage } from './pages/RemindersPage'
 
@@ -17,6 +18,16 @@ export default function App() {
           <RequireAuth>
             <AppLayout>
               <ApplicationsPage />
+            </AppLayout>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/insights"
+        element={
+          <RequireAuth>
+            <AppLayout>
+              <InsightsPage />
             </AppLayout>
           </RequireAuth>
         }

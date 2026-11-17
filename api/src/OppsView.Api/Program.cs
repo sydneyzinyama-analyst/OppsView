@@ -10,6 +10,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using OppsView.Api.Data;
 using OppsView.Api.Domain;
+using OppsView.Api.Features.Analytics;
 using OppsView.Api.Features.Applications;
 using OppsView.Api.Features.Auth;
 using OppsView.Api.Features.EmailImport;
@@ -87,6 +88,7 @@ builder.Services.AddScoped<IApplicationService, ApplicationService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddSingleton<ITokenService, TokenService>();
 builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
+builder.Services.AddScoped<AnalyticsService>();
 
 // ---- Email import (Gmail) ----------------------------------------------
 // Optional: without Google:ClientId/ClientSecret the app runs normally and
