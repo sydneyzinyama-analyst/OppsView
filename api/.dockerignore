@@ -1,6 +1,0 @@
-# Keep build output, tests and local settings out of the image's build context.
-**/bin/
-**/obj/
-tests/
-*.user
-.vs/
