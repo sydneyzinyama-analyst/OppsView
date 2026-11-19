@@ -100,6 +100,8 @@ The folders group code **by feature** (`Features/Applications`), not by technica
 | `Google:RedirectUri` | default `http://localhost:5226/email/google/callback` | Must match the Google Cloud console exactly |
 | `Google:WebAppUrl` | default `http://localhost:5173` | Where the browser goes after connecting |
 | `Google:InitialSyncDays`, `Google:MaxMessagesPerSync` | defaults 60 and 200 | |
+| `Hosting:ApiPrefix` | empty locally; `api` in the container image | Puts every endpoint under `/api/…`, so the API can also serve the website from `wwwroot` on the same address |
+| `Database:MigrateOnStartup` | `false` | `true` in the cloud: apply EF migrations when the app starts |
 | `RateLimiting:AuthPerMinute` | default 10 | Login / register attempts per minute per client IP; more get 429 |
 | `RabbitMq:Url` | user-secrets / env `RabbitMq__Url` | **Secret.** `amqps://user:pass@host/vhost`. Optional: without it, events wait in the outbox |
 | `Outbox:PollSeconds` | default 5 | How often waiting events are sent; 0 turns the sender off |
@@ -133,8 +135,8 @@ It consumes `reminder.due` (from the notifier) on its own queue, `api.reminders`
 ## Container image
 
 ```bash
-docker build -t oppsview-api .     # from api/
+docker build -f api/Dockerfile -t oppsview-api .     # from the repository root
 docker run -p 8080:8080 -e ConnectionStrings__Default="..." -e Jwt__SigningKey="..." oppsview-api
 ```
 
-Two stages: build with the .NET SDK, run on the ASP.NET runtime image as the non-root `app` user, on port 8080. CI builds it on every push.
+Three stages: build the React app with Node, build the API with the .NET SDK, then run on the ASP.NET runtime image as the non-root `app` user, on port 8080. The website goes into `wwwroot`, and the API serves it: any address that isn't `/api/…` or `/health` gets the React app. CI builds the image on every push.

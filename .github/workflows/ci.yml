@@ -107,7 +107,7 @@ jobs:
     name: Container image (${{ matrix.service }})
     runs-on: ubuntu-latest
     # Only build images once the tests pass.
-    needs: [api, matcher, notifier]
+    needs: [api, web, matcher, notifier]
     strategy:
       fail-fast: false
       matrix:
@@ -115,6 +115,12 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Build (not pushed yet; deployment pushes)
-        run: docker build --tag oppsview-${{ matrix.service }}:ci ${{ matrix.service }}
+        # The API image also contains the website, so it builds from the repository root.
+        run: |
+          if [ "${{ matrix.service }}" = api ]; then
+            docker build --tag oppsview-api:ci --file api/Dockerfile .
+          else
+            docker build --tag oppsview-${{ matrix.service }}:ci ${{ matrix.service }}
+          fi
       - name: Image size
         run: docker image ls oppsview-${{ matrix.service }}:ci --format "{{.Repository}}:{{.Tag}} {{.Size}}"

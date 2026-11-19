@@ -22,6 +22,7 @@ using OppsView.Api.Features.EmailImport.Parsing;
 using OppsView.Api.Features.Matching;
 using OppsView.Api.Features.Reminders;
 using OppsView.Api.Infrastructure;
+using OppsView.Api.Infrastructure.Hosting;
 using OppsView.Api.Infrastructure.Messaging;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -140,6 +141,9 @@ builder.Services
         // C# ones ("AppliedOn"), so the client can map them to form fields.
         options.ModelMetadataDetailsProviders.Add(new SystemTextJsonValidationMetadataProvider());
         options.Filters.Add<DomainExceptionFilter>();
+        // In the cloud the API serves the website too, and lives under /api.
+        var apiPrefix = builder.Configuration["Hosting:ApiPrefix"];
+        if (!string.IsNullOrWhiteSpace(apiPrefix)) options.Conventions.Add(new ApiRoutePrefixConvention(apiPrefix));
     })
     .AddJsonOptions(options =>
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
@@ -200,6 +204,18 @@ builder.Services.AddHealthChecks().AddDbContextCheck<AppDbContext>(tags: ["ready
 
 var app = builder.Build();
 
+// In the cloud, bring the database schema up to date on startup (one
+// instance runs, so there's no race). Locally you run "dotnet ef database update".
+if (app.Configuration.GetValue("Database:MigrateOnStartup", false))
+{
+    using var scope = app.Services.CreateScope();
+    await scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.MigrateAsync();
+}
+
+// The built React app, when present (the container image copies it into
+// wwwroot). Locally wwwroot doesn't exist and Vite serves the website.
+var servesWebsite = app.Environment.WebRootFileProvider.GetFileInfo("index.html").Exists;
+
 // ---- Pipeline (order matters) ------------------------------------------
 app.UseForwardedHeaders();
 app.UseExceptionHandler();
@@ -211,6 +227,22 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+if (servesWebsite)
+{
+    // index.html and the hashed /assets/* files. Assets never change under
+    // the same name, so browsers may keep them for a year.
+    app.UseDefaultFiles();
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        OnPrepareResponse = ctx =>
+        {
+            ctx.Context.Response.Headers.CacheControl = ctx.Context.Request.Path.StartsWithSegments("/assets")
+                ? "public, max-age=31536000, immutable"
+                : "no-cache";
+        },
+    });
+}
+
 app.UseCors();
 app.UseRateLimiter();
 app.UseAuthentication();
@@ -218,6 +250,17 @@ app.UseAuthorization();
 app.MapControllers();
 app.MapHealthChecks("/health", new HealthCheckOptions { Predicate = _ => false }); // liveness: no checks, just "up"
 app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = check => check.Tags.Contains("ready") });
+if (servesWebsite)
+{
+    // Any other address is a page of the React app (/insights, /match, …):
+    // send index.html and let React's router show it. Unknown /api/... stays a 404.
+    var apiPrefix = app.Configuration["Hosting:ApiPrefix"]?.Trim('/');
+    if (!string.IsNullOrEmpty(apiPrefix)) app.Map($"/{apiPrefix}/{{**rest}}", () => Results.NotFound());
+    app.MapFallbackToFile("index.html", new StaticFileOptions
+    {
+        OnPrepareResponse = ctx => ctx.Context.Response.Headers.CacheControl = "no-cache",
+    });
+}
 
 app.Run();
 

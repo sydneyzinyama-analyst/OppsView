@@ -1,0 +1,11 @@
+# Used with "docker build -f api/Dockerfile ." (the repository root is the
+# build context). Keep everything out except what the image needs.
+**
+!api/src/**
+!web/**
+**/bin/
+**/obj/
+web/node_modules/
+web/dist/
+web/coverage/
+*.user
